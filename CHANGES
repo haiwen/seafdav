@@ -1,0 +1,47 @@
+=======
+CHANGES
+=======
+
+0.5.0
+=====
+- Bundled with CherryPy standalone WSGI server
+- Added copyright notes for original PyFileServer
+- Changed signature of DAVProvider (and derived classes): provider argument was
+  removed
+- New method DAVResource.getMemberList() replaces getMemberNames().
+- New class DAVCollection allows for more efficient implementation of custom
+  providers.
+- Forcing 'Connection: close', when a required Content-Length is missing. 
+  So it's possible now to return GET responses without knowing the size. 
+- New property manager based on CouchDB (addons.couch_property_manager)
+- New property manager based on MongoDB (addons.mongo_property_manager)
+- New sample DAV provider for MongoDBs (samples.mongo_dav_provider)
+- Debug output goes to stdout (was stderr)
+- Support davmount (rfc 4709).
+- Added support for Microsoft FOLDER behavior.
+- renamed displayType() -> getDirectoryInfo()
+- Fixed RANGE response 
+
+
+0.4.0.b3
+========
+- Refactored LockManager. using separate LockStorage
+- Bugfixes
+
+
+0.4.0.b2
+========
+- Bugfixes
+
+
+0.4.0.b1
+========
+- Using HTTP/1.1 with keep-alive (Stéphane KLEIN)
+- Correctly return pre- and postconditions on lock conflicts.
+- Added Sphinx docs
+- Added Mercurial provider
+- Changed configuration: no property manager used by default
+
+Until 0.4.0 alpha
+=================
+See http://code.google.com/p/wsgidav/wiki/ChangeLog04
