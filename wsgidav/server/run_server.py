@@ -330,6 +330,10 @@ def _runCherryPy(app, config, mode):
             app,
 #            server_name=version
             )
+
+        # server.ssl_certificate = "/data/programs/seaf-dav/test.pem"
+        # server.ssl_private_key = "/data/programs/seaf-dav/test.pem"
+
         try:
             server.start()
         except KeyboardInterrupt:

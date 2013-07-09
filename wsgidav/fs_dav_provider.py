@@ -181,7 +181,7 @@ class FolderResource(DAVCollection):
     def getCreationDate(self):
         return self.filestat[stat.ST_CTIME]
     def getDisplayName(self):
-        return self.name
+        return self.name + "-1"
     def getDirectoryInfo(self):
         return None
     def getEtag(self):
