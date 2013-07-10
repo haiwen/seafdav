@@ -19,6 +19,47 @@ __docformat__ = "reStructuredText"
 
 _logger = util.getModuleLogger(__name__)
 
+
+class SeafileStream(object):
+    """
+    Implements basic file-like interface.
+    """
+    def __init__(self, file_obj):
+        self.file_obj = file_obj
+        self.block = None
+        self.block_idx = 0
+        self.block_offset = 0
+
+    def read(self, size):
+        remain = size
+        blocks = self.file_obj.blocks
+        ret = ""
+
+        while True:
+            if not self.block or self.block_offset == len(self.block):
+                if self.block_idx == len(blocks):
+                    break
+                self.block = SeafBlock(blocks[self.block_idx]).read()
+                self.block_idx += 1
+                self.block_offset = 0
+
+            if self.block_offset + remain >= len(self.block)-1:
+                ret += self.block[self.block_offset:]
+                self.block_offset = len(self.block)
+                remain -= (len(self.block) - self.block_offset)
+            else:
+                ret += self.block[self.block_offset:self.block_offset+remain]
+                self.block_offset += remain
+                remain = 0
+
+            if remain == 0:
+                break
+
+        return ret
+
+    def close(self):
+        pass
+
 #===============================================================================
 # SeafileResource
 #===============================================================================
@@ -59,14 +100,8 @@ class SeafileResource(DAVNonCollection):
         See DAVResource.getContent()
         """
         assert not self.isCollection
-        # issue 28: if we open in text mode, \r\n is converted to one byte.
-        # So the file size reported by Windows differs from len(..), thus
-        # content-length will be wrong. 
-#        mime = self.getContentType()
-#        if mime.startswith("text"):
-#            return file(self._filePath, "r", BUFFER_SIZE)
-        raise DAVError(HTTP_FORBIDDEN)
-   
+        return SeafileStream(self.obj)
+
 
     def beginWrite(self, contentType=None):
         """Open content as a stream for writing.
@@ -360,7 +395,7 @@ class SeafileProvider(DAVProvider):
         for segment in segments:
             obj = obj.lookup(segment)
 
-            if isinstance(obj, SeafFile) and i != n_segs-1:
+            if not obj or (isinstance(obj, SeafFile) and i != n_segs-1):
                 raise DAVError(HTTP_NOT_FOUND)
 
             rel_path += "/" + segment
@@ -375,13 +410,13 @@ class SeafileProvider(DAVProvider):
         for repo in repos:
             if repo.name == repo_name:
                 ret_repo = repo
-                break;
+                break
 
         if not ret_repo:
             for repo in repos:
                 if repo.name + "-" + repo.id == repo_name:
                     ret_repo = repo
-                    break;
+                    break
             if not ret_repo:
                 raise DAVError(HTTP_NOT_FOUND)
 

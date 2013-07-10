@@ -95,6 +95,9 @@ class SeafDir(SeafObj):
                     obj_id = entry[1]
                     mode = SEAF_METADATA_TYPE_DIR
                     break
+        if not obj_id:
+            return None
+
         obj = None
         if mode == SEAF_METADATA_TYPE_FILE:
             obj = SeafFile(obj_id)
