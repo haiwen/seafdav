@@ -9,11 +9,14 @@ import shutil
 import stat
 import sys
 import time
+import tempfile
 
 import seaserv
 from seaserv import seafile_api
 from pysearpc import SearpcError
-from seafObj import *
+import seafObj
+from seafObj import SeafDir, SeafFile, SeafCommit, SeafBlock
+from seaf_utils import SEAFILE_CONF_DIR
 
 __docformat__ = "reStructuredText"
 
@@ -69,6 +72,7 @@ class SeafileResource(DAVNonCollection):
         self.repo = repo
         self.rel_path = rel_path
         self.obj = obj
+        self.username = environ.get("http_authenticator.username", "")
 
     # Getter methods for standard live properties     
     def getContentLength(self):
@@ -82,13 +86,15 @@ class SeafileResource(DAVNonCollection):
 #        return mimetype
         return util.guessMimeType(self.path)
     def getCreationDate(self):
-        return int(time.time())
+#        return int(time.time())
+        return None
     def getDisplayName(self):
         return self.name
     def getEtag(self):
         return self.obj.obj_id
     def getLastModified(self):
-        return int(time.time())
+#        return int(time.time())
+        return None
     def supportEtag(self):
         return True
     def supportRanges(self):
@@ -111,8 +117,17 @@ class SeafileResource(DAVNonCollection):
         assert not self.isCollection
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)               
-        raise DAVError(HTTP_FORBIDDEN)
 
+        fd, path = tempfile.mkstemp(dir=self.provider.tmpdir)
+        self.tmpfile_path = path
+        return os.fdopen(fd, "wb")
+
+    def endWrite(self, withErrors):
+        if not withErrors:
+            parent, filename = os.path.split(self.rel_path)
+            seafile_api.put_file(self.repo.id, self.tmpfile_path, parent, filename,
+                                 self.username, None)
+        os.unlink(self.tmpfile_path)
     
     def delete(self):
         """Remove this resource or collection (recursive).
@@ -154,10 +169,12 @@ class SeafDirResource(DAVCollection):
         self.repo = repo
         self.rel_path = rel_path
         self.obj = obj
+        self.username = environ.get("http_authenticator.username", "")
 
     # Getter methods for standard live properties     
     def getCreationDate(self):
-        return int(time.time())
+#        return int(time.time())
+        return None
     def getDisplayName(self):
         return self.name
     def getDirectoryInfo(self):
@@ -165,7 +182,8 @@ class SeafDirResource(DAVCollection):
     def getEtag(self):
         return self.obj.obj_id
     def getLastModified(self):
-        return int(time.time())
+#        return int(time.time())
+        return None
 
     def getMemberNames(self):
         namelist = []
@@ -216,8 +234,21 @@ class SeafDirResource(DAVCollection):
         assert not "/" in name
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)               
-        raise DAVError(HTTP_FORBIDDEN)
-    
+
+        seafile_api.post_empty_file(self.repo.id, self.rel_path, name, self.username)
+
+        # Repo was updated, can't use self.repo
+        repo = seafile_api.get_repo(self.repo.id)
+        if not repo:
+            raise DAVError(HTTP_INTERNAL_ERROR)
+
+        member_rel_path = "/".join([self.rel_path, name])
+        member_path = "/".join([self.path, name])
+        obj = resolveRepoPath(repo, member_rel_path)
+        if not obj or not isinstance(obj, SeafFile):
+            raise DAVError(HTTP_INTERNAL_ERROR)
+
+        return SeafileResource(member_path, repo, member_rel_path, obj, self.environ)
 
     def createCollection(self, name):
         """Create a new collection as member of self.
@@ -265,7 +296,8 @@ class RootResource(DAVCollection):
 
     # Getter methods for standard live properties     
     def getCreationDate(self):
-        return int(time.time())
+#        return int(time.time())
+        return None
     def getDisplayName(self):
         return ""
     def getDirectoryInfo(self):
@@ -273,10 +305,11 @@ class RootResource(DAVCollection):
     def getEtag(self):
         return None
     def getLastModified(self):
-        return int(time.time())
+#        return int(time.time())
+        return None
 
     def getMemberNames(self):
-        all_repos = self.provider.getAccessibleRepos(self.username)
+        all_repos = getAccessibleRepos(self.username)
 
         name_hash = {}
         for r in all_repos:
@@ -299,7 +332,7 @@ class RootResource(DAVCollection):
         return namelist
 
     def getMember(self, name):
-        repo = self.provider.getRepoByName(name, self.username)
+        repo = getRepoByName(name, self.username)
         return self._createRootRes(repo, name)
 
     def getMemberList(self):
@@ -308,7 +341,7 @@ class RootResource(DAVCollection):
         The default implementation call getMemberNames() then call getMember()
         for each name. This calls getAccessibleRepos() for too many times.
         """
-        all_repos = self.provider.getAccessibleRepos(self.username)
+        all_repos = getAccessibleRepos(self.username)
 
         name_hash = {}
         for r in all_repos:
@@ -333,7 +366,7 @@ class RootResource(DAVCollection):
         return member_list
 
     def _createRootRes(self, repo, name):
-        root_id = get_commit_root_id(repo.head_cmmt_id)
+        root_id = seafObj.get_commit_root_id(repo.head_cmmt_id)
         obj = SeafDir(root_id)
         obj.load()
         return SeafDirResource("/"+name, repo, "/", obj, self.environ)
@@ -370,6 +403,9 @@ class SeafileProvider(DAVProvider):
     def __init__(self, readonly=False):
         super(SeafileProvider, self).__init__()
         self.readonly = readonly
+        self.tmpdir = os.path.join(SEAFILE_CONF_DIR, "webdavtmp")
+        if not os.access(self.tmpdir, os.F_OK):
+            os.mkdir(self.tmpdir)
         
     def __repr__(self):
         rw = "Read-Write"
@@ -377,95 +413,6 @@ class SeafileProvider(DAVProvider):
             rw = "Read-Only"
         return "%s for Seafile (%s)" % (self.__class__.__name__, rw)
 
-    def resolvePath(self, path, username):
-        segments = path.strip("/").split("/")
-        if len(segments) == 0:
-            raise DAVError(HTTP_BAD_REQUEST)
-        repo_name = segments.pop(0)
-
-        repo = self.getRepoByName(repo_name, username)
-
-        rel_path = ""
-        root_id = get_commit_root_id(repo.head_cmmt_id)
-        obj = SeafDir(root_id)
-        obj.load()
-
-        n_segs = len(segments)
-        i = 0
-        for segment in segments:
-            obj = obj.lookup(segment)
-
-            if not obj or (isinstance(obj, SeafFile) and i != n_segs-1):
-                raise DAVError(HTTP_NOT_FOUND)
-
-            rel_path += "/" + segment
-            i += 1
-
-        return (repo, rel_path, obj)
-
-    def getRepoByName(self, repo_name, username):
-        repos = self.getAccessibleRepos(username)
-
-        ret_repo = None
-        for repo in repos:
-            if repo.name == repo_name:
-                ret_repo = repo
-                break
-
-        if not ret_repo:
-            for repo in repos:
-                if repo.name + "-" + repo.id == repo_name:
-                    ret_repo = repo
-                    break
-            if not ret_repo:
-                raise DAVError(HTTP_NOT_FOUND)
-
-        return ret_repo
-
-    def getAccessibleRepos(self, username):
-        all_repos = {}
-
-        def addRepo(repo_id):
-            try:
-                if all_repos.has_key(repo_id):
-                    return
-                repo = seafile_api.get_repo(repo_id)
-                if repo:
-                    all_repos[repo_id] = repo
-            except SearpcError, e:
-                util.warn("Failed to get repo %.8s: %s" % (repo_id, e.msg))
-
-        try:
-            owned_repos = seafile_api.get_owned_repo_list(username)
-        except SearpcError, e:
-            util.warn("Failed to list owned repos: %s" % e.msg)
-
-        for orepo in owned_repos:
-            addRepo(orepo.id)
-
-        try:
-            shared_repos = seafile_api.get_share_in_repo_list(username, -1, -1)
-        except SearpcError, e:
-            util.warn("Failed to list shared repos: %s" % e.msg)
-
-        for srepo in shared_repos:
-            addRepo(srepo.repo_id)
-
-        try:
-            joined_groups = seaserv.get_personal_groups_by_user(username)
-        except SearpcError, e:
-            util.warn("Failed to get groups for %s" % username)
-        for g in joined_groups:
-            try:
-                group_repos = seafile_api.get_group_repo_list(g.id)
-                for repo in group_repos:
-                    if all_repos.has_key(repo.id):
-                        continue
-                    all_repos[repo.id] = repo
-            except SearpcError, e:
-                util.warn("Failed to list repos in group %d" % g.id)
-
-        return all_repos.values()
 
     def getResourceInst(self, path, environ):
         """Return info dictionary for path.
@@ -479,8 +426,123 @@ class SeafileProvider(DAVProvider):
         if path == "/" or path == "":
             return RootResource(username, environ)
 
-        repo, rel_path, obj = self.resolvePath(path, username)
+        path = path.rstrip("/")
+        try:
+            repo, rel_path, obj = resolvePath(path, username)
+        except DAVError, e:
+            if e.value == HTTP_NOT_FOUND:
+                return None
+            raise
 
         if isinstance(obj, SeafDir):
             return SeafDirResource(path, repo, rel_path, obj, environ)
         return SeafileResource(path, repo, rel_path, obj, environ)
+
+def resolvePath(path, username):
+    segments = path.strip("/").split("/")
+    if len(segments) == 0:
+        raise DAVError(HTTP_BAD_REQUEST)
+    repo_name = segments.pop(0)
+
+    repo = getRepoByName(repo_name, username)
+
+    rel_path = ""
+    root_id = seafObj.get_commit_root_id(repo.head_cmmt_id)
+    obj = SeafDir(root_id)
+    obj.load()
+
+    n_segs = len(segments)
+    i = 0
+    for segment in segments:
+        obj = obj.lookup(segment)
+
+        if not obj or (isinstance(obj, SeafFile) and i != n_segs-1):
+            raise DAVError(HTTP_NOT_FOUND)
+
+        rel_path += "/" + segment
+        i += 1
+
+    return (repo, rel_path, obj)
+
+def resolveRepoPath(repo, path):
+    segments = path.strip("/").split("/")
+
+    root_id = seafObj.get_commit_root_id(repo.head_cmmt_id)
+    obj = SeafDir(root_id)
+    obj.load()
+
+    n_segs = len(segments)
+    i = 0
+    for segment in segments:
+        obj = obj.lookup(segment)
+
+        if not obj or (isinstance(obj, SeafFile) and i != n_segs-1):
+            return None
+
+        i += 1
+
+    return obj
+
+def getRepoByName(repo_name, username):
+    repos = getAccessibleRepos(username)
+
+    ret_repo = None
+    for repo in repos:
+        if repo.name == repo_name:
+            ret_repo = repo
+            break
+
+    if not ret_repo:
+        for repo in repos:
+            if repo.name + "-" + repo.id == repo_name:
+                ret_repo = repo
+                break
+        if not ret_repo:
+            raise DAVError(HTTP_NOT_FOUND)
+
+    return ret_repo
+
+def getAccessibleRepos(username):
+    all_repos = {}
+
+    def addRepo(repo_id):
+        try:
+            if all_repos.has_key(repo_id):
+                return
+            repo = seafile_api.get_repo(repo_id)
+            if repo:
+                all_repos[repo_id] = repo
+        except SearpcError, e:
+            util.warn("Failed to get repo %.8s: %s" % (repo_id, e.msg))
+
+    try:
+        owned_repos = seafile_api.get_owned_repo_list(username)
+    except SearpcError, e:
+        util.warn("Failed to list owned repos: %s" % e.msg)
+
+    for orepo in owned_repos:
+        addRepo(orepo.id)
+
+    try:
+        shared_repos = seafile_api.get_share_in_repo_list(username, -1, -1)
+    except SearpcError, e:
+        util.warn("Failed to list shared repos: %s" % e.msg)
+
+    for srepo in shared_repos:
+        addRepo(srepo.repo_id)
+
+    try:
+        joined_groups = seaserv.get_personal_groups_by_user(username)
+    except SearpcError, e:
+        util.warn("Failed to get groups for %s" % username)
+    for g in joined_groups:
+        try:
+            group_repos = seafile_api.get_group_repo_list(g.id)
+            for repo in group_repos:
+                if all_repos.has_key(repo.id):
+                    continue
+                all_repos[repo.id] = repo
+        except SearpcError, e:
+            util.warn("Failed to list repos in group %d" % g.id)
+
+    return all_repos.values()

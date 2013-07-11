@@ -8,6 +8,7 @@ import json
 import binascii
 import os
 
+from seaf_utils import SEAFILE_CONF_DIR
 import backends
 
 ZERO_OBJ_ID = '0000000000000000000000000000000000000000'
@@ -15,13 +16,6 @@ ZERO_OBJ_ID = '0000000000000000000000000000000000000000'
 SEAF_METADATA_TYPE_FILE = 1
 SEAF_METADATA_TYPE_LINK = 2
 SEAF_METADATA_TYPE_DIR = 3
-
-try:
-    SEAFILE_CONF_DIR = os.environ['SEAFILE_CONF_DIR']
-    if not SEAFILE_CONF_DIR: # If it's set but is an empty string.
-        raise KeyError
-except KeyError:
-    raise ImportError("Seaserv cannot be imported, because environment variable SEAFILE_CONF_DIR is undefined.")
 
 commit_backend, fs_backend, block_backend = backends.load_backends(SEAFILE_CONF_DIR)
 
