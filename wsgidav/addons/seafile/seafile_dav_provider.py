@@ -235,7 +235,12 @@ class SeafDirResource(DAVCollection):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)               
 
-        seafile_api.post_empty_file(self.repo.id, self.rel_path, name, self.username)
+        try:
+            seafile_api.post_empty_file(self.repo.id, self.rel_path, name, self.username)
+        except SearpcError, e:
+            if e.msg == 'Invalid file name':
+                raise DAVError(HTTP_BAD_REQUEST)
+            raise
 
         # Repo was updated, can't use self.repo
         repo = seafile_api.get_repo(self.repo.id)
