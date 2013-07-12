@@ -796,6 +796,11 @@ class RequestServer(object):
 
         if srcRes.isCollection:
             destPath = destPath.rstrip("/") + "/"
+
+        # Remove username
+        atLoc = destNetloc.rfind("@")
+        if atLoc != -1:
+            destNetloc = destNetloc[atLoc+1:]
         
         if destScheme and destScheme.lower() != environ["wsgi.url_scheme"].lower():
             self._fail(HTTP_BAD_GATEWAY,

@@ -129,36 +129,61 @@ class SeafileResource(DAVNonCollection):
                                  self.username, None)
         os.unlink(self.tmpfile_path)
     
-    def delete(self):
-        """Remove this resource or collection (recursive).
-        
-        See DAVResource.delete()
-        """
+    def handleDelete(self):
         if self.provider.readonly:
-            raise DAVError(HTTP_FORBIDDEN)               
-        raise DAVError(HTTP_FORBIDDEN)
-            
+            raise DAVError(HTTP_FORBIDDEN)
 
-    def copyMoveSingle(self, destPath, isMove):
-        """See DAVResource.copyMoveSingle() """
-        if self.provider.readonly:
-            raise DAVError(HTTP_FORBIDDEN)               
-        raise DAVError(HTTP_FORBIDDEN)
-               
+        parent, filename = os.path.split(self.rel_path)
+        seafile_api.del_file(self.repo.id, parent, filename, self.username)
 
-    def supportRecursiveMove(self, destPath):
-        """Return True, if moveRecursive() is available (see comments there)."""
         return True
 
-    
-    def moveRecursive(self, destPath):
-        """See DAVResource.moveRecursive() """
+    def handleMove(self, destPath):
         if self.provider.readonly:
-            raise DAVError(HTTP_FORBIDDEN)               
-        raise DAVError(HTTP_FORBIDDEN)
-               
+            raise DAVError(HTTP_FORBIDDEN)
+
+        parts = destPath.strip("/").split("/", 1)
+        if len(parts) <= 1:
+            raise DAVError(HTTP_BAD_REQUEST)
+        repo_name = parts[0]
+        rel_path = parts[1]
+
+        dest_dir, dest_file = os.path.split(rel_path)
+        dest_repo = getRepoByName(repo_name, self.username)
+
+        src_dir, src_file = os.path.split(self.rel_path)
+
+        if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
+            raise DAVError(HTTP_BAD_REQUEST)
+
+        seafile_api.move_file(self.repo.id, src_dir, src_file,
+                              dest_repo.id, dest_dir, dest_file, self.username)
+
+        return True
+
+    def handleCopy(self, destPath, depthInfinity):
+        if self.provider.readonly:
+            raise DAVError(HTTP_FORBIDDEN)
+
+        parts = destPath.strip("/").split("/", 1)
+        if len(parts) <= 1:
+            raise DAVError(HTTP_BAD_REQUEST)
+        repo_name = parts[0]
+        rel_path = parts[1]
+
+        dest_dir, dest_file = os.path.split(rel_path)
+        dest_repo = getRepoByName(repo_name, self.username)
+
+        src_dir, src_file = os.path.split(self.rel_path)
+
+        if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
+            raise DAVError(HTTP_BAD_REQUEST)
+
+        seafile_api.copy_file(self.repo.id, src_dir, src_file,
+                              dest_repo.id, dest_dir, dest_file, self.username)
 
 
+        return True
     
 #===============================================================================
 # SeafDirResource
@@ -263,36 +288,67 @@ class SeafDirResource(DAVCollection):
         assert not "/" in name
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)               
-        raise DAVError(HTTP_FORBIDDEN)
 
-    def delete(self):
-        """Remove this resource or collection (recursive).
-        
-        See DAVResource.delete()
-        """
+        if not seafile_api.is_valid_filename(self.repo.id, name):
+            raise DAVError(HTTP_BAD_REQUEST)
+
+        seafile_api.post_dir(self.repo.id, self.rel_path, name, self.username)
+
+    def handleDelete(self):
         if self.provider.readonly:
-            raise DAVError(HTTP_FORBIDDEN)               
-        raise DAVError(HTTP_FORBIDDEN)
-            
+            raise DAVError(HTTP_FORBIDDEN)
 
-    def copyMoveSingle(self, destPath, isMove):
-        """See DAVResource.copyMoveSingle() """
-        if self.provider.readonly:
-            raise DAVError(HTTP_FORBIDDEN)               
-        raise DAVError(HTTP_FORBIDDEN)
-               
+        parent, filename = os.path.split(self.rel_path)
+        seafile_api.del_file(self.repo.id, parent, filename, self.username)
 
-    def supportRecursiveMove(self, destPath):
-        """Return True, if moveRecursive() is available (see comments there)."""
         return True
 
-    
-    def moveRecursive(self, destPath):
-        """See DAVResource.moveRecursive() """
+    def handleMove(self, destPath):
         if self.provider.readonly:
-            raise DAVError(HTTP_FORBIDDEN)               
-        raise DAVError(HTTP_FORBIDDEN)
-               
+            raise DAVError(HTTP_FORBIDDEN)
+
+        parts = destPath.strip("/").split("/", 1)
+        if len(parts) <= 1:
+            raise DAVError(HTTP_BAD_REQUEST)
+        repo_name = parts[0]
+        rel_path = parts[1]
+
+        dest_dir, dest_file = os.path.split(rel_path)
+        dest_repo = getRepoByName(repo_name, self.username)
+
+        src_dir, src_file = os.path.split(self.rel_path)
+
+        if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
+            raise DAVError(HTTP_BAD_REQUEST)
+
+        seafile_api.move_file(self.repo.id, src_dir, src_file,
+                              dest_repo.id, dest_dir, dest_file, self.username)
+
+        return True
+
+    def handleCopy(self, destPath, depthInfinity):
+        if self.provider.readonly:
+            raise DAVError(HTTP_FORBIDDEN)
+
+        parts = destPath.strip("/").split("/", 1)
+        if len(parts) <= 1:
+            raise DAVError(HTTP_BAD_REQUEST)
+        repo_name = parts[0]
+        rel_path = parts[1]
+
+        dest_dir, dest_file = os.path.split(rel_path)
+        dest_repo = getRepoByName(repo_name, self.username)
+
+        src_dir, src_file = os.path.split(self.rel_path)
+
+        if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
+            raise DAVError(HTTP_BAD_REQUEST)
+
+        seafile_api.copy_file(self.repo.id, src_dir, src_file,
+                              dest_repo.id, dest_dir, dest_file, self.username)
+
+
+        return True               
 
 class RootResource(DAVCollection):
     def __init__(self, username, environ):
