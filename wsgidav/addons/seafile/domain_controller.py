@@ -1,14 +1,14 @@
 import os
 import ccnet
 from pysearpc import SearpcError
+from seaf_utils import CCNET_CONF_DIR
 
 class SeafileDomainController(object):
 
-    def __init__(self, ccnet_conf_dir):
-        self.ccnet_conf_dir = os.path.normpath(os.path.expanduser(ccnet_conf_dir))
-        print "Loading ccnet config from " + self.ccnet_conf_dir
+    def __init__(self):
+        ccnet_conf_dir = os.path.normpath(os.path.expanduser(CCNET_CONF_DIR))
 
-        pool = ccnet.ClientPool(self.ccnet_conf_dir)
+        pool = ccnet.ClientPool(ccnet_conf_dir)
         self.ccnet_threaded_rpc = ccnet.CcnetThreadedRpcClient(pool, req_pool=True)
 
     def __repr__(self):
@@ -30,6 +30,9 @@ class SeafileDomainController(object):
         return ""
 
     def authDomainUser(self, realmname, username, password, environ):
+        if "'" in username:
+            return False
+
         try:
             ret = self.ccnet_threaded_rpc.validate_emailuser(username, password)
         except:

@@ -118,6 +118,9 @@ class SeafileResource(DAVNonCollection):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)               
 
+        if seafile_api.check_permission(self.repo.id, self.username) != "rw":
+            raise DAVError(HTTP_FORBIDDEN)
+
         fd, path = tempfile.mkstemp(dir=self.provider.tmpdir)
         self.tmpfile_path = path
         return os.fdopen(fd, "wb")
@@ -131,6 +134,9 @@ class SeafileResource(DAVNonCollection):
     
     def handleDelete(self):
         if self.provider.readonly:
+            raise DAVError(HTTP_FORBIDDEN)
+
+        if seafile_api.check_permission(self.repo.id, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
 
         parent, filename = os.path.split(self.rel_path)
@@ -151,7 +157,12 @@ class SeafileResource(DAVNonCollection):
         dest_dir, dest_file = os.path.split(rel_path)
         dest_repo = getRepoByName(repo_name, self.username)
 
+        if seafile_api.check_permission(dest_repo.id, self.username) != "rw":
+            raise DAVError(HTTP_FORBIDDEN)
+
         src_dir, src_file = os.path.split(self.rel_path)
+        if not src_file:
+            raise DAVError(HTTP_BAD_REQUEST)
 
         if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
             raise DAVError(HTTP_BAD_REQUEST)
@@ -174,7 +185,12 @@ class SeafileResource(DAVNonCollection):
         dest_dir, dest_file = os.path.split(rel_path)
         dest_repo = getRepoByName(repo_name, self.username)
 
+        if seafile_api.check_permission(dest_repo.id, self.username) != "rw":
+            raise DAVError(HTTP_FORBIDDEN)
+
         src_dir, src_file = os.path.split(self.rel_path)
+        if not src_file:
+            raise DAVError(HTTP_BAD_REQUEST)
 
         if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
             raise DAVError(HTTP_BAD_REQUEST)
@@ -260,6 +276,9 @@ class SeafDirResource(DAVCollection):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)               
 
+        if seafile_api.check_permission(self.repo.id, self.username) != "rw":
+            raise DAVError(HTTP_FORBIDDEN)
+
         try:
             seafile_api.post_empty_file(self.repo.id, self.rel_path, name, self.username)
         except SearpcError, e:
@@ -289,6 +308,9 @@ class SeafDirResource(DAVCollection):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)               
 
+        if seafile_api.check_permission(self.repo.id, self.username) != "rw":
+            raise DAVError(HTTP_FORBIDDEN)
+
         if not seafile_api.is_valid_filename(self.repo.id, name):
             raise DAVError(HTTP_BAD_REQUEST)
 
@@ -298,7 +320,14 @@ class SeafDirResource(DAVCollection):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
 
+        if seafile_api.check_permission(self.repo.id, self.username) != "rw":
+            raise DAVError(HTTP_FORBIDDEN)
+
         parent, filename = os.path.split(self.rel_path)
+        # Can't delete repo root
+        if not filename:
+            raise DAVError(HTTP_BAD_REQUEST)
+
         seafile_api.del_file(self.repo.id, parent, filename, self.username)
 
         return True
@@ -316,7 +345,12 @@ class SeafDirResource(DAVCollection):
         dest_dir, dest_file = os.path.split(rel_path)
         dest_repo = getRepoByName(repo_name, self.username)
 
+        if seafile_api.check_permission(dest_repo.id, self.username) != "rw":
+            raise DAVError(HTTP_FORBIDDEN)
+
         src_dir, src_file = os.path.split(self.rel_path)
+        if not src_file:
+            raise DAVError(HTTP_BAD_REQUEST)
 
         if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
             raise DAVError(HTTP_BAD_REQUEST)
@@ -339,7 +373,12 @@ class SeafDirResource(DAVCollection):
         dest_dir, dest_file = os.path.split(rel_path)
         dest_repo = getRepoByName(repo_name, self.username)
 
+        if seafile_api.check_permission(dest_repo.id, self.username) != "rw":
+            raise DAVError(HTTP_FORBIDDEN)
+
         src_dir, src_file = os.path.split(self.rel_path)
+        if not src_file:
+            raise DAVError(HTTP_BAD_REQUEST)
 
         if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
             raise DAVError(HTTP_BAD_REQUEST)
@@ -348,7 +387,7 @@ class SeafDirResource(DAVCollection):
                               dest_repo.id, dest_dir, dest_file, self.username)
 
 
-        return True               
+        return True
 
 class RootResource(DAVCollection):
     def __init__(self, username, environ):
@@ -430,31 +469,25 @@ class RootResource(DAVCollection):
         root_id = seafObj.get_commit_root_id(repo.head_cmmt_id)
         obj = SeafDir(root_id)
         obj.load()
-        return SeafDirResource("/"+name, repo, "/", obj, self.environ)
+        return SeafDirResource("/"+name, repo, "", obj, self.environ)
 
     # --- Read / write ---------------------------------------------------------
     
     def createEmptyResource(self, name):
         raise DAVError(HTTP_FORBIDDEN)
-    
 
     def createCollection(self, name):
         raise DAVError(HTTP_FORBIDDEN)
 
-    def delete(self):
+    def handleDelete(self):
         raise DAVError(HTTP_FORBIDDEN)
-            
 
-    def copyMoveSingle(self, destPath, isMove):
+    def handleMove(self, destPath):
         raise DAVError(HTTP_FORBIDDEN)
-               
 
-    def supportRecursiveMove(self, destPath):
-        return True
-
-    
-    def moveRecursive(self, destPath):
+    def handleCopy(self, destPath, depthInfinity):
         raise DAVError(HTTP_FORBIDDEN)
+
     
 #===============================================================================
 # SeafileProvider
@@ -606,4 +639,10 @@ def getAccessibleRepos(username):
         except SearpcError, e:
             util.warn("Failed to list repos in group %d" % g.id)
 
-    return all_repos.values()
+    # Don't include encrypted repos
+    ret = []
+    for repo in all_repos.values():
+        if not repo.encrypted:
+            ret.append(repo)
+
+    return ret
