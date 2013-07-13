@@ -125,7 +125,9 @@ class WsgiDAVApp(object):
     def __init__(self, config):
         self.config = config
 
-        util.initLogging(config["verbose"], config.get("enable_loggers", []))
+        util.initLogging(config["verbose"],
+                         config.get("log_path", ""),
+                         config.get("enable_loggers", []))
         
         util.log("Default encoding: %s (file system: %s)" % (sys.getdefaultencoding(), sys.getfilesystemencoding()))
         
@@ -222,7 +224,7 @@ class WsgiDAVApp(object):
                                         authacceptbasic, 
                                         authacceptdigest, 
                                         authdefaultdigest)      
-        application = ErrorPrinter(application, catchall=False)
+        application = ErrorPrinter(application, catchall=True)
 
         application = WsgiDavDebugFilter(application, config)
         
@@ -370,20 +372,14 @@ class WsgiDAVApp(object):
                     extra.append('elap=%.3fsec' % (time.time() - start_time))
                 extra = ", ".join(extra)
                         
-#               This is the CherryPy format:     
-#                127.0.0.1 - - [08/Jul/2009:17:25:23] "GET /loginPrompt?redirect=/renderActionList%3Frelation%3Dpersonal%26key%3D%26filter%3DprivateSchedule&reason=0 HTTP/1.1" 200 1944 "http://127.0.0.1:8002/command?id=CMD_Schedule" "Mozilla/5.0 (Windows; U; Windows NT 6.0; de; rv:1.9.1) Gecko/20090624 Firefox/3.5"
-#                print >>sys.stderr, '%s - %s - [%s] "%s" %s -> %s' % (
-                print >>sys.stdout, '%s - %s - [%s] "%s" %s -> %s' % (
-                                        threadInfo + environ.get("REMOTE_ADDR",""),                                                         
-                                        userInfo,
-                                        util.getLogTime(), 
-                                        environ.get("REQUEST_METHOD") + " " + environ.get("PATH_INFO", ""),
-                                        extra, 
-                                        status,
-#                                        response_headers.get(""), # response Content-Length
-                                        # referer
-                                     )
- 
+                util.log('%s - %s - "%s" %s -> %s' % (
+                        environ.get("REMOTE_ADDR",""),
+                        userInfo,
+                        environ.get("REQUEST_METHOD") + " " + environ.get("PATH_INFO", ""),
+                        extra, 
+                        status
+                        ))
+
             return start_response(status, response_headers, exc_info)
             
         # Call next middleware

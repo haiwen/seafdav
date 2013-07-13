@@ -112,7 +112,7 @@ If no config file is found, a default FilesystemProvider is used."""
                       action="store_const", const=0, dest="verbose",
                       help="suppress any output except for errors.")
     parser.add_option("-v", "--verbose",
-                      action="store_const", const=2, dest="verbose", default=1,
+                      action="store_const", const=2, dest="verbose", default=2,
                       help="Set verbose = 2: print informational output.")
     parser.add_option("-d", "--debug",
                       action="store_const", const=3, dest="verbose",
@@ -125,6 +125,10 @@ If no config file is found, a default FilesystemProvider is used."""
     parser.add_option("", "--reload",
                       action="store_true", dest="reload", 
                       help="Restart server when source files are changed. Used by run_reloading_server. (Requires paste.reloader.)")
+
+    parser.add_option("-l", "--log-file",
+                      dest="log_path",
+                      help="Log file path.")
 
 #    parser.add_option("", "--profile",
 #                      action="store_true", dest="profile", 
@@ -227,6 +231,9 @@ def _initConfig():
     if cmdLineOpts["verbose"] >= 3:
         print "Configuration(%s):" % cmdLineOpts["config_file"]
         pprint(config)
+
+    if cmdLineOpts.get("log_path"):
+        config["log_path"] = cmdLineOpts.get("log_path")
 
     if not config["provider_mapping"]:
         print >>sys.stderr, "ERROR: No DAV provider defined. Try --help option."

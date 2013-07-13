@@ -131,7 +131,7 @@ def _parsegmtime(timestring):
 # Logging
 #===============================================================================
 
-def initLogging(verbose=2, enable_loggers=[]):
+def initLogging(verbose=2, log_file="", enable_loggers=[]):
     """Initialize base logger named 'wsgidav'.
 
     The base logger is filtered by the `verbose` configuration option.
@@ -186,14 +186,16 @@ def initLogging(verbose=2, enable_loggers=[]):
     =======  ======  ===========  ======================  =======================
     """
 
-    formatter = logging.Formatter("<%(thread)d> [%(asctime)s.%(msecs)d] %(name)s:  %(message)s",
-                                  "%H:%M:%S")
+    formatter = logging.Formatter("[%(asctime)s]:  %(message)s", "%H:%M:%S")
     
     # Define handlers
-    consoleHandler = logging.StreamHandler(sys.stdout)
+    if not log_file:
+        myHandler = logging.StreamHandler(sys.stdout)
+    else:
+        myHandler = logging.FileHandler(log_file)
 #    consoleHandler = logging.StreamHandler(sys.stderr)
-    consoleHandler.setFormatter(formatter)
-    consoleHandler.setLevel(logging.DEBUG)
+    myHandler.setFormatter(formatter)
+    myHandler.setLevel(logging.DEBUG)
 
     # Add the handlers to the base logger
     logger = logging.getLogger(BASE_LOGGER_NAME)
@@ -221,7 +223,7 @@ def initLogging(verbose=2, enable_loggers=[]):
             pass
         logger.removeHandler(hdlr)
 
-    logger.addHandler(consoleHandler)
+    logger.addHandler(myHandler)
 
     if verbose >= 2:
         for e in enable_loggers:
