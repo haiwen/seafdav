@@ -137,9 +137,6 @@ If no config file is found, a default FilesystemProvider is used."""
    
     (options, args) = parser.parse_args()
 
-    if len(args) > 0:
-        parser.error("Too many arguments")
-
     if options.config_file is None:
         # If --config was omitted, use default (if it exists)
         defPath = os.path.abspath(DEFAULT_CONFIG_FILE)
@@ -159,7 +156,7 @@ If no config file is found, a default FilesystemProvider is used."""
         print "Command line options:"
         for k, v in cmdLineOpts.items():
             print "    %-12s: %s" % (k, v)
-    return cmdLineOpts
+    return (cmdLineOpts, args)
 
 
 
@@ -199,7 +196,7 @@ def _readConfigFile(config_file, verbose):
 
 def _initConfig():
     """Setup configuration dictionary from default, command line and configuration file."""
-    cmdLineOpts = _initCommandLineOptions()
+    cmdLineOpts, args = _initCommandLineOptions()
 
     # Set config defaults
     config = DEFAULT_CONFIG.copy()
@@ -250,7 +247,7 @@ def _initConfig():
 #        import pydevd
 #        pydevd.settrace()
 
-    return config
+    return (config, args)
 
 
 
@@ -470,23 +467,21 @@ SUPPORTED_SERVERS = {"paste": _runPaste,
 
 
 def run():
-    config = _initConfig()
+    config, args = _initConfig()
     
     app = WsgiDAVApp(config)
     
-    # Try running WsgiDAV inside the following external servers:
-    res = False
-    for e in config["ext_servers"]:
-        fn = SUPPORTED_SERVERS.get(e)
-        if fn is None:
-            print "Invalid external server '%s'. (expected: '%s')" % (e, "', '".join(SUPPORTED_SERVERS.keys()))
-            
-        elif fn(app, config, e):
-            res = True
-            break
-    
-    if not res:
-        print "No supported WSGI server installed."   
+    if len(args) > 0:
+        if args[0] == "runfcgi":
+            if len(args) >= 2 and args[1] == "method=threaded":
+                _runFlup(app, config, "flup-fcgi")
+            else:
+                _runFlup(app, config, "flup-fcgi_fork")
+        else:
+            util.warn("Unknown command %s" % args[0])
+            exit(1)
+    else:
+        _runCherryPy(app, config, "cherrypy-bundled")
 
     
 if __name__ == "__main__":
