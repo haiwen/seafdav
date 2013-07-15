@@ -186,7 +186,7 @@ def initLogging(verbose=2, log_file="", enable_loggers=[]):
     =======  ======  ===========  ======================  =======================
     """
 
-    formatter = logging.Formatter("[%(asctime)s]:  %(message)s", "%H:%M:%S")
+    formatter = logging.Formatter("[%(asctime)s]:  %(message)s")
     
     # Define handlers
     if not log_file:

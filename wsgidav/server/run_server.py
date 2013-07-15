@@ -57,7 +57,7 @@ except ImportError, e:
 __docformat__ = "reStructuredText"
 
 # Use this config file, if no --config_file option is specified
-DEFAULT_CONFIG_FILE = "wsgidav.conf"
+DEFAULT_CONFIG_FILE = "settings.py"
 
 
 def _initCommandLineOptions():
