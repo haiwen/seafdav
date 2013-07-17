@@ -250,6 +250,12 @@ def _initConfig():
         pid_file = os.path.abspath(pid_file)
         config["pid_file"] = pid_file
 
+    ssl_cert = config.get("ssl_cert", "")
+    ssl_privkey = config.get("ssl_privkey", "")
+    if (ssl_cert and not ssl_privkey) or (not ssl_cert and ssl_privkey):
+        print >>sys.stderr, "ERROR: SSL certificate and private key must be given together."
+        sys.exit(-1)
+
     if not config["provider_mapping"]:
         print >>sys.stderr, "ERROR: No DAV provider defined. Try --help option."
         sys.exit(-1)
@@ -353,8 +359,11 @@ def _runCherryPy(app, config, mode):
 #            server_name=version
             )
 
-        # server.ssl_certificate = "/data/programs/seaf-dav/test.pem"
-        # server.ssl_private_key = "/data/programs/seaf-dav/test.pem"
+        ssl_cert = config.get("ssl_cert", "")
+        ssl_privkey = config.get("ssl_privkey", "")
+        if ssl_cert:
+            server.ssl_certificate = ssl_cert
+            server.ssl_private_key = ssl_privkey
 
         try:
             server.start()
