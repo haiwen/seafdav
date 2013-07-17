@@ -44,6 +44,7 @@ from wsgidav.wsgidav_app import DEFAULT_CONFIG
 import traceback
 import sys
 import os
+import daemon
 
 from wsgidav import util
 
@@ -129,6 +130,14 @@ If no config file is found, a default FilesystemProvider is used."""
     parser.add_option("-l", "--log-file",
                       dest="log_path",
                       help="Log file path.")
+
+    parser.add_option("", "--daemon",
+                      action="store_true", dest="daemonize", default=False,
+                      help="Run as daemon")
+
+    parser.add_option("", "--pid",
+                      dest="pid_file",
+                      help="PID file path")
 
 #    parser.add_option("", "--profile",
 #                      action="store_true", dest="profile", 
@@ -229,8 +238,17 @@ def _initConfig():
         print "Configuration(%s):" % cmdLineOpts["config_file"]
         pprint(config)
 
-    if cmdLineOpts.get("log_path"):
-        config["log_path"] = cmdLineOpts.get("log_path")
+    log_path = cmdLineOpts.get("log_path", "")
+    if log_path:
+        log_path = os.path.abspath(log_path)
+        config["log_path"] = log_path
+
+    config["daemonize"] = cmdLineOpts.get("daemonize")
+
+    pid_file = cmdLineOpts.get("pid_file", "")
+    if pid_file:
+        pid_file = os.path.abspath(pid_file)
+        config["pid_file"] = pid_file
 
     if not config["provider_mapping"]:
         print >>sys.stderr, "ERROR: No DAV provider defined. Try --help option."
@@ -465,12 +483,9 @@ SUPPORTED_SERVERS = {"paste": _runPaste,
 #        return
 #    return _real_run(config) 
 
-
-def run():
-    config, args = _initConfig()
-    
+def davmain(config, args):
     app = WsgiDAVApp(config)
-    
+
     if len(args) > 0:
         if args[0] == "runfcgi":
             if len(args) >= 2 and args[1] == "method=threaded":
@@ -483,6 +498,25 @@ def run():
     else:
         _runCherryPy(app, config, "cherrypy-bundled")
 
+
+def run():
+    config, args = _initConfig()
+
+    if config["daemonize"]:
+        context = daemon.DaemonContext()
+        pid_file_name = config.get("pid_file", "")
+        with context:
+            if pid_file_name:
+                f = open(pid_file_name, "w+")
+                print >> f, os.getpid()
+                f.close()
+            try:
+                davmain(config, args)
+            finally:
+                if pid_file_name:
+                    os.unlink(pid_file_name)
+    else:
+        davmain(config, args)
     
 if __name__ == "__main__":
     run()
