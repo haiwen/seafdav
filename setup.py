@@ -68,7 +68,7 @@ Project home: http://wsgidav.googlecode.com/
       extras_require = {},
       test_suite = "tests.test_all.run",
       entry_points = {
-          "console_scripts" : ["wsgidav = wsgidav.server.run_server:run"],
+          "console_scripts" : ["seafdav = wsgidav.server.run_server:run"],
           },
       # TODO: PP:
 #      entry_points = """
