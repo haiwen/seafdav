@@ -1,3 +1,8 @@
+# Copyright 2013 Seafile, Inc
+# Licensed under the terms of seafile-pro-license.txt.
+# You are not allowed to modify or redistribute this file.
+#
+
 from wsgidav.dav_error import DAVError, HTTP_BAD_REQUEST, HTTP_FORBIDDEN, \
     HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR
 from wsgidav.dav_provider import DAVProvider, DAVCollection, DAVNonCollection

@@ -1,3 +1,10 @@
+SeafDAV is based on WsgiDAV server.
+WsgiDAV is under MIT license. All changes to WsgiDAV is released
+under MIT license, except for the source files in wsgidav/addons/seafile.
+Source files in wsgidav/addons/seafile is licensed to the end users under
+the terms of Seafile Professional Edition Software License Agreement.
+A copy of the agreement is included in wsgidav/addons/seafile/seafile-pro-license.txt.
+
 The MIT License
 
 Copyright (c) 2009-2011 Martin Wendt

@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# Copyright 2013 Seafile, Inc
+# Licensed under the terms of seafile-pro-license.txt.
+# You are not allowed to modify or redistribute this file.
+#
+
 import wsgidav.util
 import stat
 import struct
