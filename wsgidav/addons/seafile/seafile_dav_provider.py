@@ -648,6 +648,7 @@ def getAccessibleRepos(username):
     ret = []
     for repo in all_repos.values():
         if not repo.encrypted:
+            repo.name = repo.name.encode('utf-8');
             ret.append(repo)
 
     return ret
