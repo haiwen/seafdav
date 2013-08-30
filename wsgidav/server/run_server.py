@@ -58,7 +58,7 @@ except ImportError, e:
 __docformat__ = "reStructuredText"
 
 # Use this config file, if no --config_file option is specified
-DEFAULT_CONFIG_FILE = "settings.py"
+DEFAULT_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "settings.py")
 
 
 def _initCommandLineOptions():

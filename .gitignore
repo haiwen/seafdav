@@ -1,0 +1,8 @@
+*.pyc
+*.pydevproject
+*~
+*#
+*.log
+*.gz
+build/
+dist/
