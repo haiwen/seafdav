@@ -1,10 +1,10 @@
-# -*- coding: iso-8859-1 -*-
+#coding: UTF-8
 """
 run_server
 ==========
 
 :Author: Ho Chun Wei, fuzzybr80(at)gmail.com (author of original PyFileServer)
-:Author: Martin Wendt, moogle(at)wwwendt.de 
+:Author: Martin Wendt, moogle(at)wwwendt.de
 :Copyright: Licensed under the MIT license, see LICENSE file in this package.
 
 Standalone server that runs WsgiDAV.
@@ -14,28 +14,28 @@ These tasks are performed:
     - Set up the configuration from defaults, configuration file, and command line
       options.
     - Instantiate the WsgiDAVApp object (which is a WSGI application)
-    - Start a WSGI server for this WsgiDAVApp object   
+    - Start a WSGI server for this WsgiDAVApp object
 
 Configuration is defined like this:
 
     1. Get the name of a configuration file from command line option
        ``--config-file=FILENAME`` (or short ``-cFILENAME``).
-       If this option is omitted, we use ``wsgidav.conf`` in the current 
+       If this option is omitted, we use ``wsgidav.conf`` in the current
        directory.
-    2. Set reasonable default settings. 
+    2. Set reasonable default settings.
     3. If configuration file exists: read and use it to overwrite defaults.
     4. If command line options are passed, use them to override settings:
-    
+
        ``--host`` option overrides ``hostname`` setting.
-         
-       ``--port`` option overrides ``port`` setting.  
-       
-       ``--root=FOLDER`` option creates a FilesystemProvider that publishes 
+
+       ``--port`` option overrides ``port`` setting.
+
+       ``--root=FOLDER`` option creates a FilesystemProvider that publishes
        FOLDER on the '/' share.
 
 See DEVELOPERS.txt_ for more information about the WsgiDAV architecture.
 
-.. _DEVELOPERS.txt: http://wiki.wsgidav-dev.googlecode.com/hg/DEVELOPERS.html  
+.. _DEVELOPERS.txt: http://wiki.wsgidav-dev.googlecode.com/hg/DEVELOPERS.html
 """
 from optparse import OptionParser
 from pprint import pprint
@@ -63,14 +63,14 @@ DEFAULT_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "settings.py")
 
 def _initCommandLineOptions():
     """Parse command line options into a dictionary."""
-    
+
     usage = """\
 %prog [options]
 
 Examples:
-Share filesystem folder '/temp': 
+Share filesystem folder '/temp':
   wsgidav --port=80 --host=0.0.0.0 --root=/temp
-Run using a configuration file: 
+Run using a configuration file:
   wsgidav --port=80 --host=0.0.0.0 --config=~/wsgidav.conf
 
 If no config file is specified, the application will look for a file named
@@ -86,27 +86,27 @@ If no config file is found, a default FilesystemProvider is used."""
 
 #    epilog = """Licensed under the MIT license.
 #See http://wsgidav.googlecode.com for additional information."""
-            
-    parser = OptionParser(usage=usage, 
+
+    parser = OptionParser(usage=usage,
                           version=__version__,
 #                          conflict_handler="error",
                           description=None, #description,
                           add_help_option=True,
 #                          prog="wsgidav",
 #                          epilog=epilog # TODO: Not available on Python 2.4?
-                          )    
- 
-    parser.add_option("-p", "--port", 
+                          )
+
+    parser.add_option("-p", "--port",
                       dest="port",
                       type="int",
                       default=8080,
                       help="port to serve on (default: %default)")
-    parser.add_option("-H", "--host", # '-h' conflicts with --help  
+    parser.add_option("-H", "--host", # '-h' conflicts with --help
                       dest="host",
                       default="localhost",
                       help="host to serve from (default: %default). 'localhost' is only accessible from the local computer. Use 0.0.0.0 to make your application public"),
     parser.add_option("-r", "--root",
-                      dest="root_path", 
+                      dest="root_path",
                       help="Path to a file system folder to publish as share '/'.")
 
     parser.add_option("-q", "--quiet",
@@ -118,13 +118,13 @@ If no config file is found, a default FilesystemProvider is used."""
     parser.add_option("-d", "--debug",
                       action="store_const", const=3, dest="verbose",
                       help="Set verbose = 3: print requests and responses.")
-    
+
     parser.add_option("-c", "--config",
-                      dest="config_file", 
+                      dest="config_file",
                       help="Configuration file (default: %s in current directory)." % DEFAULT_CONFIG_FILE)
 
     parser.add_option("", "--reload",
-                      action="store_true", dest="reload", 
+                      action="store_true", dest="reload",
                       help="Restart server when source files are changed. Used by run_reloading_server. (Requires paste.reloader.)")
 
     parser.add_option("-l", "--log-file",
@@ -140,10 +140,10 @@ If no config file is found, a default FilesystemProvider is used."""
                       help="PID file path")
 
 #    parser.add_option("", "--profile",
-#                      action="store_true", dest="profile", 
+#                      action="store_true", dest="profile",
 #                      help="Profile ")
 
-   
+
     (options, args) = parser.parse_args()
 
     if options.config_file is None:
@@ -175,7 +175,7 @@ def _readConfigFile(config_file, verbose):
 
     if not os.path.exists(config_file):
         raise RuntimeError("Couldn't open configuration file '%s'." % config_file)
-    
+
     try:
         import imp
         conf = {}
@@ -186,18 +186,18 @@ def _readConfigFile(config_file, verbose):
                 continue
             elif isfunction(v):
                 continue
-            conf[k] = v               
+            conf[k] = v
     except Exception, e:
 #        if verbose >= 1:
-#            traceback.print_exc() 
+#            traceback.print_exc()
         exceptioninfo = traceback.format_exception_only(sys.exc_type, sys.exc_value) #@UndefinedVariable
         exceptiontext = ""
         for einfo in exceptioninfo:
-            exceptiontext += einfo + "\n"   
+            exceptiontext += einfo + "\n"
 #        raise RuntimeError("Failed to read configuration file: " + config_file + "\nDue to " + exceptiontext)
         print >>sys.stderr, "Failed to read configuration file: " + config_file + "\nDue to " + exceptiontext
         raise
-    
+
     return conf
 
 
@@ -212,14 +212,14 @@ def _initConfig():
 
     # Configuration file overrides defaults
     config_file = cmdLineOpts.get("config_file")
-    if config_file: 
+    if config_file:
         verbose = cmdLineOpts.get("verbose", 2)
         fileConf = _readConfigFile(config_file, verbose)
         config.update(fileConf)
     else:
         if cmdLineOpts["verbose"] >= 2:
             print "Running without configuration file."
-    
+
     # Command line overrides file
     if cmdLineOpts.get("port"):
         config["port"] = cmdLineOpts.get("port")
@@ -233,7 +233,7 @@ def _initConfig():
     if cmdLineOpts.get("root_path"):
         root_path = os.path.abspath(cmdLineOpts.get("root_path"))
         config["provider_mapping"]["/"] = FilesystemProvider(root_path)
-    
+
     if cmdLineOpts["verbose"] >= 3:
         print "Configuration(%s):" % cmdLineOpts["config_file"]
         pprint(config)
@@ -278,7 +278,7 @@ def _initConfig():
 
 def _runPaste(app, config, mode):
     """Run WsgiDAV using paste.httpserver, if Paste is installed.
-    
+
     See http://pythonpaste.org/modules/httpserver.html for more options
     """
     _logger = util.getModuleLogger(__name__, True)
@@ -290,10 +290,10 @@ def _runPaste(app, config, mode):
 
         # See http://pythonpaste.org/modules/httpserver.html for more options
         server = httpserver.serve(app,
-                         host=config["host"], 
+                         host=config["host"],
                          port=config["port"],
                          server_version=version,
-                         # This option enables handling of keep-alive 
+                         # This option enables handling of keep-alive
                          # and expect-100:
                          protocol_version="HTTP/1.1",
                          start_loop=False
@@ -345,16 +345,16 @@ def _runCherryPy(app, config, mode):
         if mode == "cherrypy-bundled":
             from wsgidav.server import cherrypy_wsgiserver as wsgiserver
         else:
-            # http://cherrypy.org/apidocs/3.0.2/cherrypy.wsgiserver-module.html  
+            # http://cherrypy.org/apidocs/3.0.2/cherrypy.wsgiserver-module.html
             from cherrypy import wsgiserver, __version__ as cp_version
         version = "WsgiDAV/%s %s" % (__version__, wsgiserver.CherryPyWSGIServer.version)
         wsgiserver.CherryPyWSGIServer.version = version
         if config["verbose"] >= 1:
 #            print "Running %s..." % version
-            print("Runing %s, listening on %s://%s:%s" 
+            print("Runing %s, listening on %s://%s:%s"
                   % (version, 'http', config["host"], config["port"]))
         server = wsgiserver.CherryPyWSGIServer(
-            (config["host"], config["port"]), 
+            (config["host"], config["port"]),
             app,
 #            server_name=version
             )
@@ -389,7 +389,7 @@ def _runFlup(app, config, mode):
         elif mode == "flup-fcgi_fork":
             from flup.server.fcgi_fork import WSGIServer, __version__ as flupver
         else:
-            raise ValueError    
+            raise ValueError
 
         if config["verbose"] >= 2:
             print "Running WsgiDAV/%s %s/%s..." % (__version__,
@@ -458,22 +458,22 @@ SUPPORTED_SERVERS = {"paste": _runPaste,
 
 #def _run_real(config):
 #    app = WsgiDAVApp(config)
-#    
+#
 #    # Try running WsgiDAV inside the following external servers:
 #    res = False
 #    for e in config["ext_servers"]:
 #        fn = SUPPORTED_SERVERS.get(e)
 #        if fn is None:
 #            print "Invalid external server '%s'. (expected: '%s')" % (e, "', '".join(SUPPORTED_SERVERS.keys()))
-#            
+#
 #        elif fn(app, config, e):
 #            res = True
 #            break
-#    
-#    if not res:
-#        print "No supported WSGI server installed."   
 #
-#    
+#    if not res:
+#        print "No supported WSGI server installed."
+#
+#
 #def run():
 #    config = _initConfig()
 #    if config.get("profile"):
@@ -490,7 +490,7 @@ SUPPORTED_SERVERS = {"paste": _runPaste,
 ##        logging.info("Profile data:\n%s", stream.getvalue())
 #        print stream.getvalue()
 #        return
-#    return _real_run(config) 
+#    return _real_run(config)
 
 def davmain(config, args):
     app = WsgiDAVApp(config)
@@ -525,7 +525,16 @@ def run():
                 if pid_file_name:
                     os.unlink(pid_file_name)
     else:
-        davmain(config, args)
-    
+        pid_file_name = config.get("pid_file", "")
+        if pid_file_name:
+            f = open(pid_file_name, "w+")
+            print >> f, os.getpid()
+            f.close()
+        try:
+            davmain(config, args)
+        finally:
+            if pid_file_name:
+                os.unlink(pid_file_name)
+
 if __name__ == "__main__":
     run()

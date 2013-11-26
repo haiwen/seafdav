@@ -32,8 +32,7 @@ share_name = '/'
 def load_seafdav_conf():
     global share_name
 
-    install_topdir = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '..', '..')
-    seafdav_conf = os.path.join(install_topdir, 'pro-data', 'seafdav.conf')
+    seafdav_conf = os.environ['SEAFDAV_CONF']
     if not os.path.exists(seafdav_conf):
         return
 
@@ -45,7 +44,10 @@ def load_seafdav_conf():
         share_name = config.get(section_name, 'share_name')
 
 
-load_seafdav_conf()
+try:
+    load_seafdav_conf()
+except:
+    pass
 
 provider_mapping = {}
 provider_mapping[share_name] = SeafileProvider()
