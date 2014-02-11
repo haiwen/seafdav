@@ -44,7 +44,9 @@ from wsgidav.wsgidav_app import DEFAULT_CONFIG
 import traceback
 import sys
 import os
-import daemon
+
+if os.name != 'nt':
+    import daemon
 
 from wsgidav import util
 
