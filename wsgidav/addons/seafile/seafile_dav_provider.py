@@ -99,10 +99,8 @@ class SeafileResource(DAVNonCollection):
         return self.obj.obj_id
 
     def getLastModified(self):
-        print "get mtime for file %s" % self.rel_path
         cached_mtime = getattr(self.obj, 'last_modified', None)
         if cached_mtime:
-            print "get cached mtime for file %s" % self.rel_path
             return cached_mtime
 
         parent, filename = os.path.split(self.rel_path)
