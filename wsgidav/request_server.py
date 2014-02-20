@@ -802,18 +802,18 @@ class RequestServer(object):
         if atLoc != -1:
             destNetloc = destNetloc[atLoc+1:]
         
-        if destScheme and destScheme.lower() != environ["wsgi.url_scheme"].lower():
-            self._fail(HTTP_BAD_GATEWAY,
-                       "Source and destination must have the same scheme.")
-        elif destNetloc and destNetloc.lower() != environ["HTTP_HOST"].lower():
-            # TODO: this should consider environ["SERVER_PORT"] also
-            self._fail(HTTP_BAD_GATEWAY,
-                       "Source and destination must have the same host name.")
-        elif not destPath.startswith(provider.mountPath + provider.sharePath):
-            # Inter-realm copying not supported, since its not possible to 
-            # authentication-wise
-            self._fail(HTTP_BAD_GATEWAY, 
-                       "Inter-realm copy/move is not supported.")
+        # if destScheme and destScheme.lower() != environ["wsgi.url_scheme"].lower():
+        #     self._fail(HTTP_BAD_GATEWAY,
+        #                "Source and destination must have the same scheme.")
+        # elif destNetloc and destNetloc.lower() != environ["HTTP_HOST"].lower():
+        #     # TODO: this should consider environ["SERVER_PORT"] also
+        #     self._fail(HTTP_BAD_GATEWAY,
+        #                "Source and destination must have the same host name.")
+        # elif not destPath.startswith(provider.mountPath + provider.sharePath):
+        #     # Inter-realm copying not supported, since its not possible to 
+        #     # authentication-wise
+        #     self._fail(HTTP_BAD_GATEWAY, 
+        #                "Inter-realm copy/move is not supported.")
 
         destPath = destPath[len(provider.mountPath + provider.sharePath):]
         assert destPath.startswith("/")

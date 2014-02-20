@@ -97,9 +97,22 @@ class SeafileResource(DAVNonCollection):
         return self.name
     def getEtag(self):
         return self.obj.obj_id
+
     def getLastModified(self):
-#        return int(time.time())
+        print "get mtime for file %s" % self.rel_path
+        cached_mtime = getattr(self.obj, 'last_modified', None)
+        if cached_mtime:
+            print "get cached mtime for file %s" % self.rel_path
+            return cached_mtime
+
+        parent, filename = os.path.split(self.rel_path)
+        mtimes = seafile_api.get_files_last_modified(self.repo.id, parent, -1)
+        for mtime in mtimes:
+            if (mtime.file_name.encode('utf-8') == filename):
+                return mtime.last_modified
+
         return None
+
     def supportEtag(self):
         return True
     def supportRanges(self):
@@ -171,6 +184,11 @@ class SeafileResource(DAVNonCollection):
 
         if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
             raise DAVError(HTTP_BAD_REQUEST)
+
+        # some clients such as GoodReader requires "overwrite" semantics
+        file_id_dest = seafile_api.get_file_id_by_path(dest_repo.id, rel_path)
+        if file_id_dest != None:
+            seafile_api.del_file(dest_repo.id, dest_dir, dest_file, self.username)
 
         seafile_api.move_file(self.repo.id, src_dir, src_file,
                               dest_repo.id, dest_dir, dest_file, self.username)
@@ -261,9 +279,21 @@ class SeafDirResource(DAVCollection):
             member_rel_path = "/".join([self.rel_path, e[0]])
             res = SeafDirResource(member_path, self.repo, member_rel_path, member, self.environ)
             member_list.append(res)
+
+        file_mtimes = []
+        try:
+            file_mtimes = seafile_api.get_files_last_modified(self.repo.id, self.rel_path, -1)
+        except:
+            raise DAVError(HTTP_INTERNAL_ERROR)
+
         for e in self.obj.files:
             member = SeafFile(e[1])
             member.load()
+
+            for mtime in file_mtimes:
+                if mtime.file_name.encode('utf-8') == e[0]:
+                    member.last_modified = mtime.last_modified
+
             member_path = "/".join([self.path, e[0]])
             member_rel_path = "/".join([self.rel_path, e[0]])
             res = SeafileResource(member_path, self.repo, member_rel_path, member, self.environ)
