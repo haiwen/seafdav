@@ -1,21 +1,6 @@
-all: seaf-dav.tar.gz
+all: seafdav.tar.gz
 
-seaf-dav.tar.gz:
-	cd .. && \
-	tar czvf $@ seaf-dav/ \
-	--exclude='*.git*' \
-	--exclude='*.log' \
-	--exclude='*~' \
-	--exclude='*#' \
-	--exclude='*.gz' \
-	--exclude='*.pyc' \
-	--exclude='build/*' \
-	--exclude='dist/*' \
-	--exclude='Makefile' \
-	--exclude='.pydevproject' \
-	--exclude='.project' \
-	--exclude-vcs && \
-	mv $@ seaf-dav/
-
+seafdav.tar.gz:
+	git archive HEAD | gzip > seafdav.tar.gz
 clean:
-	rm -f seaf-dav.tar.gz
+	rm -f *.gz
