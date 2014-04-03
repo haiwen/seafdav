@@ -21,7 +21,7 @@ from seaserv import seafile_api
 from pysearpc import SearpcError
 import seafObj
 from seafObj import SeafDir, SeafFile, SeafCommit, SeafBlock
-from seaf_utils import SEAFILE_CONF_DIR
+from seaf_utils import SEAFILE_CONF_DIR, UTF8Dict, utf8_path_join
 
 __docformat__ = "reStructuredText"
 
@@ -47,7 +47,9 @@ class SeafileStream(object):
             if not self.block or self.block_offset == len(self.block):
                 if self.block_idx == len(blocks):
                     break
-                self.block = SeafBlock(blocks[self.block_idx]).read()
+                self.block = SeafBlock(self.file_obj.store_id,
+                                       self.file_obj.version,
+                                       blocks[self.block_idx]).read()
                 self.block_idx += 1
                 self.block_offset = 0
 
@@ -79,15 +81,15 @@ class SeafileResource(DAVNonCollection):
         self.obj = obj
         self.username = environ.get("http_authenticator.username", "")
 
-    # Getter methods for standard live properties     
+    # Getter methods for standard live properties
     def getContentLength(self):
         return self.obj.filesize
     def getContentType(self):
 #        (mimetype, _mimeencoding) = mimetypes.guess_type(self.path)
-#        print "mimetype(%s): %r, %r" % (self.path, mimetype, _mimeencoding)   
+#        print "mimetype(%s): %r, %r" % (self.path, mimetype, _mimeencoding)
 #        if not mimetype:
-#            mimetype = "application/octet-stream" 
-#        print "mimetype(%s): return %r" % (self.path, mimetype)   
+#            mimetype = "application/octet-stream"
+#        print "mimetype(%s): return %r" % (self.path, mimetype)
 #        return mimetype
         return util.guessMimeType(self.path)
     def getCreationDate(self):
@@ -115,10 +117,10 @@ class SeafileResource(DAVNonCollection):
         return True
     def supportRanges(self):
         return False
-    
+
     def getContent(self):
         """Open content as a stream for reading.
-         
+
         See DAVResource.getContent()
         """
         assert not self.isCollection
@@ -127,12 +129,12 @@ class SeafileResource(DAVNonCollection):
 
     def beginWrite(self, contentType=None):
         """Open content as a stream for writing.
-         
+
         See DAVResource.beginWrite()
         """
         assert not self.isCollection
         if self.provider.readonly:
-            raise DAVError(HTTP_FORBIDDEN)               
+            raise DAVError(HTTP_FORBIDDEN)
 
         if seafile_api.check_permission(self.repo.id, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
@@ -147,7 +149,7 @@ class SeafileResource(DAVNonCollection):
             seafile_api.put_file(self.repo.id, self.tmpfile_path, parent, filename,
                                  self.username, None)
         os.unlink(self.tmpfile_path)
-    
+
     def handleDelete(self):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
@@ -189,7 +191,7 @@ class SeafileResource(DAVNonCollection):
             seafile_api.del_file(dest_repo.id, dest_dir, dest_file, self.username)
 
         seafile_api.move_file(self.repo.id, src_dir, src_file,
-                              dest_repo.id, dest_dir, dest_file, self.username)
+                              dest_repo.id, dest_dir, dest_file, self.username, 0)
 
         return True
 
@@ -217,11 +219,11 @@ class SeafileResource(DAVNonCollection):
             raise DAVError(HTTP_BAD_REQUEST)
 
         seafile_api.copy_file(self.repo.id, src_dir, src_file,
-                              dest_repo.id, dest_dir, dest_file, self.username)
+                              dest_repo.id, dest_dir, dest_file, self.username, 0)
 
 
         return True
-    
+
 #===============================================================================
 # SeafDirResource
 #===============================================================================
@@ -233,7 +235,7 @@ class SeafDirResource(DAVCollection):
         self.obj = obj
         self.username = environ.get("http_authenticator.username", "")
 
-    # Getter methods for standard live properties     
+    # Getter methods for standard live properties
     def getCreationDate(self):
 #        return int(time.time())
         return None
@@ -270,44 +272,52 @@ class SeafDirResource(DAVCollection):
 
     def getMemberList(self):
         member_list = []
-        for e in self.obj.dirs:
-            member = SeafDir(e[1])
-            member.load()
-            member_path = "/".join([self.path, e[0]])
-            member_rel_path = "/".join([self.rel_path, e[0]])
-            res = SeafDirResource(member_path, self.repo, member_rel_path, member, self.environ)
+        d = self.obj
+
+        if d.version == 0:
+            file_mtimes = []
+            try:
+                file_mtimes = seafile_api.get_files_last_modified(self.repo.id, self.rel_path, -1)
+            except:
+                raise DAVError(HTTP_INTERNAL_ERROR)
+
+            mtimes = UTF8Dict()
+            for entry in file_mtimes:
+                mtimes[entry.file_name] = entry.last_modified
+        for name, dent in d.dirents.iteritems():
+            member_path = utf8_path_join(self.path, name)
+            member_rel_path = utf8_path_join(self.rel_path, name)
+
+            if dent.is_dir():
+                obj = SeafDir(d.store_id, d.version, dent.id)
+                obj.load()
+                res = SeafDirResource(member_path, self.repo, member_rel_path, obj, self.environ)
+            elif dent.is_file():
+                obj = SeafFile(d.store_id, d.version, dent.id)
+                obj.load()
+                res = SeafileResource(member_path, self.repo, member_rel_path, obj, self.environ)
+            else:
+                continue
+
+            if d.version == 1:
+                obj.last_modified = dent.mtime
+            else:
+                obj.last_modified = mtimes[name]
+
             member_list.append(res)
 
-        file_mtimes = []
-        try:
-            file_mtimes = seafile_api.get_files_last_modified(self.repo.id, self.rel_path, -1)
-        except:
-            raise DAVError(HTTP_INTERNAL_ERROR)
-
-        for e in self.obj.files:
-            member = SeafFile(e[1])
-            member.load()
-
-            for mtime in file_mtimes:
-                if mtime.file_name.encode('utf-8') == e[0]:
-                    member.last_modified = mtime.last_modified
-
-            member_path = "/".join([self.path, e[0]])
-            member_rel_path = "/".join([self.rel_path, e[0]])
-            res = SeafileResource(member_path, self.repo, member_rel_path, member, self.environ)
-            member_list.append(res)
         return member_list
 
     # --- Read / write ---------------------------------------------------------
-    
+
     def createEmptyResource(self, name):
         """Create an empty (length-0) resource.
-        
+
         See DAVResource.createEmptyResource()
         """
         assert not "/" in name
         if self.provider.readonly:
-            raise DAVError(HTTP_FORBIDDEN)               
+            raise DAVError(HTTP_FORBIDDEN)
 
         if seafile_api.check_permission(self.repo.id, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
@@ -334,12 +344,12 @@ class SeafDirResource(DAVCollection):
 
     def createCollection(self, name):
         """Create a new collection as member of self.
-        
+
         See DAVResource.createCollection()
         """
         assert not "/" in name
         if self.provider.readonly:
-            raise DAVError(HTTP_FORBIDDEN)               
+            raise DAVError(HTTP_FORBIDDEN)
 
         if seafile_api.check_permission(self.repo.id, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
@@ -389,7 +399,7 @@ class SeafDirResource(DAVCollection):
             raise DAVError(HTTP_BAD_REQUEST)
 
         seafile_api.move_file(self.repo.id, src_dir, src_file,
-                              dest_repo.id, dest_dir, dest_file, self.username)
+                              dest_repo.id, dest_dir, dest_file, self.username, 0)
 
         return True
 
@@ -417,7 +427,7 @@ class SeafDirResource(DAVCollection):
             raise DAVError(HTTP_BAD_REQUEST)
 
         seafile_api.copy_file(self.repo.id, src_dir, src_file,
-                              dest_repo.id, dest_dir, dest_file, self.username)
+                              dest_repo.id, dest_dir, dest_file, self.username, 0)
 
 
         return True
@@ -427,7 +437,7 @@ class RootResource(DAVCollection):
         super(RootResource, self).__init__("/", environ)
         self.username = username
 
-    # Getter methods for standard live properties     
+    # Getter methods for standard live properties
     def getCreationDate(self):
 #        return int(time.time())
         return None
@@ -499,13 +509,11 @@ class RootResource(DAVCollection):
         return member_list
 
     def _createRootRes(self, repo, name):
-        root_id = seafObj.get_commit_root_id(repo.head_cmmt_id)
-        obj = SeafDir(root_id)
-        obj.load()
+        obj = get_repo_root_seafdir(repo)
         return SeafDirResource("/"+name, repo, "", obj, self.environ)
 
     # --- Read / write ---------------------------------------------------------
-    
+
     def createEmptyResource(self, name):
         raise DAVError(HTTP_FORBIDDEN)
 
@@ -521,7 +529,7 @@ class RootResource(DAVCollection):
     def handleCopy(self, destPath, depthInfinity):
         raise DAVError(HTTP_FORBIDDEN)
 
-    
+
 #===============================================================================
 # SeafileProvider
 #===============================================================================
@@ -533,7 +541,7 @@ class SeafileProvider(DAVProvider):
         self.tmpdir = os.path.join(SEAFILE_CONF_DIR, "webdavtmp")
         if not os.access(self.tmpdir, os.F_OK):
             os.mkdir(self.tmpdir)
-        
+
     def __repr__(self):
         rw = "Read-Write"
         if self.readonly:
@@ -574,9 +582,7 @@ def resolvePath(path, username):
     repo = getRepoByName(repo_name, username)
 
     rel_path = ""
-    root_id = seafObj.get_commit_root_id(repo.head_cmmt_id)
-    obj = SeafDir(root_id)
-    obj.load()
+    obj = get_repo_root_seafdir(repo)
 
     n_segs = len(segments)
     i = 0
@@ -594,9 +600,7 @@ def resolvePath(path, username):
 def resolveRepoPath(repo, path):
     segments = path.strip("/").split("/")
 
-    root_id = seafObj.get_commit_root_id(repo.head_cmmt_id)
-    obj = SeafDir(root_id)
-    obj.load()
+    obj = get_repo_root_seafdir(repo)
 
     n_segs = len(segments)
     i = 0
@@ -608,6 +612,12 @@ def resolveRepoPath(repo, path):
 
         i += 1
 
+    return obj
+
+def get_repo_root_seafdir(repo):
+    root_id = seafObj.get_commit_root_id(repo.id, repo.version, repo.head_cmmt_id)
+    obj = SeafDir(repo.id, repo.version, root_id)
+    obj.load()
     return obj
 
 def getRepoByName(repo_name, username):
@@ -676,7 +686,7 @@ def getAccessibleRepos(username):
     ret = []
     for repo in all_repos.values():
         if not repo.encrypted:
-            repo.name = repo.name.encode('utf-8');
+            repo.name = repo.name.encode('utf-8')
             ret.append(repo)
 
     return ret

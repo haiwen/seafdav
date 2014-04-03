@@ -6,3 +6,4 @@
 *.gz
 build/
 dist/
+run.sh

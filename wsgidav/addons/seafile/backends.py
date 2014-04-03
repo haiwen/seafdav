@@ -8,6 +8,8 @@
 import os
 import ConfigParser
 
+_seafile_conf_dir = None
+
 class InvalidConfigError(Exception):
     '''This type of Exception is rasied when error happens during parsing
     seafile.conf
@@ -57,23 +59,30 @@ class SeafObjBackend(object):
     def __init__(self, obj_type):
         self.obj_type = obj_type
 
-    def read_obj(self, obj_id):
+    def read_obj(self, repo_id, version, obj_id):
         raise NotImplementedError
 
 class SeafObjBackendFS(SeafObjBackend):
-    def __init__(self, obj_type, obj_dir):
+    def __init__(self, obj_type):
         SeafObjBackend.__init__(self, obj_type)
-        self.obj_dir = obj_dir
+        self.obj_dir_v0 = os.path.join(_seafile_conf_dir, obj_type)
 
-    def read_obj(self, obj_id):
-        path = id_to_path(self.obj_dir, obj_id)
+    def get_obj_v1_dir(self, repo_id):
+        return os.path.join(_seafile_conf_dir, 'storage', self.obj_type, repo_id)
+
+    def read_obj(self, repo_id, version, obj_id):
+        if version == 0:
+            path = id_to_path(self.obj_dir_v0, obj_id)
+        else:
+            path = id_to_path(self.get_obj_v1_dir(repo_id), obj_id)
+
         with open(path, 'rb') as fp:
             d = fp.read()
 
         return d
 
     def __str__(self):
-        return 'FS Object Backend(obj_type = %s, obj_dir = %s)' % (self.obj_type, self.obj_dir)
+        return 'FS Object Backend'
 
 class SeafObjBackendS3(SeafObjBackend):
     def __init__(self, obj_type, key_id, key, bucket_name):
@@ -92,24 +101,30 @@ class SeafBlockBackend(object):
     def __init__(self):
         pass
 
-    def read_block(self, block_id):
+    def read_block(self, repo_id, version, block_id):
         raise NotImplementedError
 
 class SeafBlockBackendFS(SeafBlockBackend):
-    def __init__(self, block_dir):
+    def __init__(self):
         SeafBlockBackend.__init__(self)
-        self.block_dir = block_dir
+        self.block_dir_v0 = os.path.join(_seafile_conf_dir, 'blocks')
 
-    def read_block(self, block_id):
-        path = id_to_path(self.block_dir, block_id)
+    def get_block_v1_dir(self, repo_id):
+        return os.path.join(_seafile_conf_dir, 'storage', 'blocks', repo_id)
+
+    def read_block(self, repo_id, version, block_id):
+        if version == 0:
+            path = id_to_path(self.block_dir_v0, block_id)
+        else:
+            path = id_to_path(self.get_block_v1_dir(repo_id), block_id)
+
         with open(path, 'rb') as fp:
             d = fp.read()
 
         return d
 
     def __str__(self):
-        return 'FS Block Backend(block_dir = %s)' % self.block_dir
-
+        return 'FS Block Backend'
 
 class SeafBlockBackendS3(SeafBlockBackend):
     def __init__(self, key_id, key, bucket_name):
@@ -132,9 +147,7 @@ def load_s3_config_common(section, config):
 
 
 def load_obj_backend_fs(obj_type, section, config):
-    obj_dir = config.get(section, 'object_dir')
-
-    backend = SeafObjBackendFS(obj_type, obj_dir)
+    backend = SeafObjBackendFS(obj_type)
     return backend
 
 def load_obj_backend_s3(obj_type, section, config):
@@ -143,7 +156,7 @@ def load_obj_backend_s3(obj_type, section, config):
     backend = SeafObjBackendS3(obj_type, key_id, key, bucket)
     return backend
 
-def get_obj_backend(obj_type, config, seafile_conf_dir):
+def get_obj_backend(obj_type, config):
     '''Load object backend from conf'''
     if obj_type == 'commits':
         section = 'commit_object_backend'
@@ -162,14 +175,12 @@ def get_obj_backend(obj_type, config, seafile_conf_dir):
             raise InvalidConfigError('Unknown commit object backend %s' % name)
     else:
         # Defaults to fs backend, obj_dir = <seafdir>/<obj_type>/
-        obj_backend = SeafObjBackendFS(obj_type, os.path.join(seafile_conf_dir, obj_type))
+        obj_backend = SeafObjBackendFS(obj_type)
 
     return obj_backend
 
 def load_block_backend_fs(config):
-    block_dir = config.get('block_backend', 'block_dir')
-
-    backend = SeafBlockBackendFS(block_dir)
+    backend = SeafBlockBackendFS()
     return backend
 
 def load_block_backend_s3(config):
@@ -178,7 +189,7 @@ def load_block_backend_s3(config):
     backend = SeafBlockBackendS3(key_id, key, bucket)
     return backend
 
-def get_block_backend(config, seafile_conf_dir):
+def get_block_backend(config):
     section = 'block_backend'
     if config.has_option(section, 'name'):
         name = config.get(section, 'name')
@@ -190,7 +201,7 @@ def get_block_backend(config, seafile_conf_dir):
             raise InvalidConfigError('Unknown block backend %s' % name)
     else:
         # Defaults to fs backend
-        obj_backend = SeafBlockBackendFS((os.path.join(seafile_conf_dir, 'blocks')))
+        obj_backend = SeafBlockBackendFS()
 
     return obj_backend
 
@@ -199,13 +210,15 @@ def _load_backends(seafile_conf_dir):
     config = ConfigParser.ConfigParser()
     config.read(seafile_conf)
 
-    commit_backend = get_obj_backend('commits', config, seafile_conf_dir)
-    fs_backend = get_obj_backend('fs', config, seafile_conf_dir)
-    block_backend = get_block_backend(config, seafile_conf_dir)
+    commit_backend = get_obj_backend('commits', config)
+    fs_backend = get_obj_backend('fs', config)
+    block_backend = get_block_backend(config)
 
     return (commit_backend, fs_backend, block_backend)
 
 def load_backends(seafile_conf_dir):
+    global _seafile_conf_dir
+    _seafile_conf_dir = seafile_conf_dir
     try:
         return _load_backends(seafile_conf_dir)
     except (ConfigParser.NoSectionError, ConfigParser.NoOptionError, InvalidConfigError) as e:
