@@ -27,6 +27,7 @@ __docformat__ = "reStructuredText"
 
 _logger = util.getModuleLogger(__name__)
 
+NEED_PROGRESS = 0
 
 class SeafileStream(object):
     """
@@ -190,8 +191,10 @@ class SeafileResource(DAVNonCollection):
         if file_id_dest != None:
             seafile_api.del_file(dest_repo.id, dest_dir, dest_file, self.username)
 
-        seafile_api.move_file(self.repo.id, src_dir, src_file,
-                              dest_repo.id, dest_dir, dest_file, self.username, 0)
+        copy_result = seafile_api.move_file(self.repo.id, src_dir, src_file,
+                              dest_repo.id, dest_dir, dest_file, self.username, NEED_PROGRESS)
+
+        copy_background_hack(copy_result)
 
         return True
 
@@ -218,9 +221,10 @@ class SeafileResource(DAVNonCollection):
         if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
             raise DAVError(HTTP_BAD_REQUEST)
 
-        seafile_api.copy_file(self.repo.id, src_dir, src_file,
-                              dest_repo.id, dest_dir, dest_file, self.username, 0)
+        copy_result = seafile_api.copy_file(self.repo.id, src_dir, src_file,
+                              dest_repo.id, dest_dir, dest_file, self.username, NEED_PROGRESS)
 
+        copy_background_hack(copy_result)
 
         return True
 
@@ -398,8 +402,10 @@ class SeafDirResource(DAVCollection):
         if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
             raise DAVError(HTTP_BAD_REQUEST)
 
-        seafile_api.move_file(self.repo.id, src_dir, src_file,
-                              dest_repo.id, dest_dir, dest_file, self.username, 0)
+        copy_result = seafile_api.move_file(self.repo.id, src_dir, src_file,
+                              dest_repo.id, dest_dir, dest_file, self.username, NEED_PROGRESS)
+
+        copy_background_hack(copy_result)
 
         return True
 
@@ -426,9 +432,10 @@ class SeafDirResource(DAVCollection):
         if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
             raise DAVError(HTTP_BAD_REQUEST)
 
-        seafile_api.copy_file(self.repo.id, src_dir, src_file,
-                              dest_repo.id, dest_dir, dest_file, self.username, 0)
+        copy_result = seafile_api.copy_file(self.repo.id, src_dir, src_file,
+                              dest_repo.id, dest_dir, dest_file, self.username, NEED_PROGRESS)
 
+        copy_background_hack(copy_result)
 
         return True
 
@@ -616,7 +623,7 @@ def resolveRepoPath(repo, path):
 
 def get_repo_root_seafdir(repo):
     root_id = seafObj.get_commit_root_id(repo.id, repo.version, repo.head_cmmt_id)
-    obj = SeafDir(repo.id, repo.version, root_id)
+    obj = SeafDir(repo.store_id, repo.version, root_id)
     obj.load()
     return obj
 
@@ -690,3 +697,8 @@ def getAccessibleRepos(username):
             ret.append(repo)
 
     return ret
+
+def copy_background_hack(copy_result):
+    '''If the copy/move operation is a backgroud task, sleep 1 second'''
+    if getattr(copy_result, 'background', False):
+        time.sleep(1)

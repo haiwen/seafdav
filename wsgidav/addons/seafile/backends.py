@@ -71,10 +71,10 @@ class SeafObjBackendFS(SeafObjBackend):
         return os.path.join(_seafile_conf_dir, 'storage', self.obj_type, repo_id)
 
     def read_obj(self, repo_id, version, obj_id):
-        if version == 0:
-            path = id_to_path(self.obj_dir_v0, obj_id)
-        else:
-            path = id_to_path(self.get_obj_v1_dir(repo_id), obj_id)
+        # if version == 0:
+        #     path = id_to_path(self.obj_dir_v0, obj_id)
+        # else:
+        path = id_to_path(self.get_obj_v1_dir(repo_id), obj_id)
 
         with open(path, 'rb') as fp:
             d = fp.read()
@@ -113,10 +113,10 @@ class SeafBlockBackendFS(SeafBlockBackend):
         return os.path.join(_seafile_conf_dir, 'storage', 'blocks', repo_id)
 
     def read_block(self, repo_id, version, block_id):
-        if version == 0:
-            path = id_to_path(self.block_dir_v0, block_id)
-        else:
-            path = id_to_path(self.get_block_v1_dir(repo_id), block_id)
+        # if version == 0:
+        #     path = id_to_path(self.block_dir_v0, block_id)
+        # else:
+        path = id_to_path(self.get_block_v1_dir(repo_id), block_id)
 
         with open(path, 'rb') as fp:
             d = fp.read()
