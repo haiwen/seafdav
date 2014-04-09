@@ -21,7 +21,7 @@ from seaserv import seafile_api
 from pysearpc import SearpcError
 import seafObj
 from seafObj import SeafDir, SeafFile, SeafCommit, SeafBlock
-from seaf_utils import SEAFILE_CONF_DIR, UTF8Dict, utf8_path_join
+from seaf_utils import SEAFILE_CONF_DIR, UTF8Dict, utf8_path_join, utf8_wrap
 
 __docformat__ = "reStructuredText"
 
@@ -100,7 +100,7 @@ class SeafileResource(DAVNonCollection):
     def getDisplayName(self):
         return self.name
     def getEtag(self):
-        return self.obj.obj_id
+        return utf8_wrap(self.obj.obj_id)
 
     def getLastModified(self):
         cached_mtime = getattr(self.obj, 'last_modified', None)
@@ -245,7 +245,7 @@ class SeafDirResource(DAVCollection):
     def getDirectoryInfo(self):
         return None
     def getEtag(self):
-        return self.obj.obj_id
+        return utf8_wrap(self.obj.obj_id)
     def getLastModified(self):
 #        return int(time.time())
         return None

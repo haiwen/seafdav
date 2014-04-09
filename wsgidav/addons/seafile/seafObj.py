@@ -14,7 +14,7 @@ import binascii
 import os
 import zlib
 
-from seaf_utils import SEAFILE_CONF_DIR, UTF8Dict
+from seaf_utils import SEAFILE_CONF_DIR, UTF8Dict, utf8_wrap
 import backends
 
 ZERO_OBJ_ID = '0000000000000000000000000000000000000000'
@@ -37,8 +37,8 @@ class SeafObj(object):
     backend = None
     def __init__(self, store_id, version, obj_id):
         self.version = version
-        self.store_id = store_id
-        self.obj_id = obj_id
+        self.store_id = utf8_wrap(store_id)
+        self.obj_id = utf8_wrap(obj_id)
         self.buf = ''
 
     def load_data(self):
@@ -51,9 +51,9 @@ class SeafDirent(object):
     DIR = 0
     FILE = 1
     def __init__(self, name, type, id, mtime, size):
-        self.name = name
+        self.name = utf8_wrap(name)
         self.type = type
-        self.id = id
+        self.id = utf8_wrap(id)
         self.mtime = mtime
         self.size = size
 
@@ -204,9 +204,9 @@ class SeafFile(SeafObj):
 class SeafBlock(object):
     backend = block_backend
     def __init__(self, store_id, version, block_id):
-        self.store_id = store_id
+        self.store_id = utf8_wrap(store_id)
         self.version = version
-        self.block_id = block_id
+        self.block_id = utf8_wrap(block_id)
 
     def read(self):
         return self.backend.read_block(self.store_id, self.version, self.block_id)
@@ -214,9 +214,9 @@ class SeafBlock(object):
 class SeafCommit(object):
     backend = commit_backend
     def __init__(self, repo_id, version, commit_id):
-        self.repo_id = repo_id
+        self.repo_id = utf8_wrap(repo_id)
         self.version = version
-        self.commit_id = commit_id
+        self.commit_id = utf8_wrap(commit_id)
         self.content = None
         self.buf = ''
 
