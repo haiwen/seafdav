@@ -10,17 +10,13 @@ from wsgidav.dav_provider import DAVProvider, DAVCollection, DAVNonCollection
 import wsgidav.util as util
 import os
 #import mimetypes
-import shutil
-import stat
-import sys
-import time
 import tempfile
 
 import seaserv
 from seaserv import seafile_api
 from pysearpc import SearpcError
-import seafObj
-from seafObj import SeafDir, SeafFile, SeafCommit, SeafBlock
+from seafobj import commit_mgr, fs_mgr
+from seafobj.fs import SeafFile, SeafDir
 from seaf_utils import SEAFILE_CONF_DIR, UTF8Dict, utf8_path_join, utf8_wrap
 
 __docformat__ = "reStructuredText"
@@ -29,48 +25,6 @@ _logger = util.getModuleLogger(__name__)
 
 NEED_PROGRESS = 0
 SYNCHRONOUS = 1
-
-class SeafileStream(object):
-    """
-    Implements basic file-like interface.
-    """
-    def __init__(self, file_obj):
-        self.file_obj = file_obj
-        self.block = None
-        self.block_idx = 0
-        self.block_offset = 0
-
-    def read(self, size):
-        remain = size
-        blocks = self.file_obj.blocks
-        ret = ""
-
-        while True:
-            if not self.block or self.block_offset == len(self.block):
-                if self.block_idx == len(blocks):
-                    break
-                self.block = SeafBlock(self.file_obj.store_id,
-                                       self.file_obj.version,
-                                       blocks[self.block_idx]).read()
-                self.block_idx += 1
-                self.block_offset = 0
-
-            if self.block_offset + remain >= len(self.block)-1:
-                ret += self.block[self.block_offset:]
-                self.block_offset = len(self.block)
-                remain -= (len(self.block) - self.block_offset)
-            else:
-                ret += self.block[self.block_offset:self.block_offset+remain]
-                self.block_offset += remain
-                remain = 0
-
-            if remain == 0:
-                break
-
-        return ret
-
-    def close(self):
-        pass
 
 #===============================================================================
 # SeafileResource
@@ -85,7 +39,7 @@ class SeafileResource(DAVNonCollection):
 
     # Getter methods for standard live properties
     def getContentLength(self):
-        return self.obj.filesize
+        return self.obj.size
     def getContentType(self):
 #        (mimetype, _mimeencoding) = mimetypes.guess_type(self.path)
 #        print "mimetype(%s): %r, %r" % (self.path, mimetype, _mimeencoding)
@@ -126,7 +80,7 @@ class SeafileResource(DAVNonCollection):
         See DAVResource.getContent()
         """
         assert not self.isCollection
-        return SeafileStream(self.obj)
+        return self.obj.get_stream()
 
 
     def beginWrite(self, contentType=None):
@@ -290,12 +244,10 @@ class SeafDirResource(DAVCollection):
             member_rel_path = utf8_path_join(self.rel_path, name)
 
             if dent.is_dir():
-                obj = SeafDir(d.store_id, d.version, dent.id)
-                obj.load()
+                obj = fs_mgr.load_seafdir(d.store_id, d.version, dent.id)
                 res = SeafDirResource(member_path, self.repo, member_rel_path, obj, self.environ)
             elif dent.is_file():
-                obj = SeafFile(d.store_id, d.version, dent.id)
-                obj.load()
+                obj = fs_mgr.load_seafile(d.store_id, d.version, dent.id)
                 res = SeafileResource(member_path, self.repo, member_rel_path, obj, self.environ)
             else:
                 continue
@@ -615,10 +567,8 @@ def resolveRepoPath(repo, path):
     return obj
 
 def get_repo_root_seafdir(repo):
-    root_id = seafObj.get_commit_root_id(repo.id, repo.version, repo.head_cmmt_id)
-    obj = SeafDir(repo.store_id, repo.version, root_id)
-    obj.load()
-    return obj
+    root_id = commit_mgr.get_commit_root_id(repo.id, repo.version, repo.head_cmmt_id)
+    return fs_mgr.load_seafdir(repo.store_id, repo.version, root_id)
 
 def getRepoByName(repo_name, username):
     repos = getAccessibleRepos(username)
