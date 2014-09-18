@@ -21,6 +21,9 @@ _logger = util.getModuleLogger(__name__)
 NEED_PROGRESS = 0
 SYNCHRONOUS = 1
 
+def sort_repo_list(repos):
+    return sorted(repos, lambda r1, r2: cmp(r1.id, r2.id))
+
 #===============================================================================
 # SeafileResource
 #===============================================================================
@@ -417,8 +420,8 @@ class RootResource(DAVCollection):
                 repo = r_list[0]
                 namelist.append(repo.name)
             else:
-                for repo in r_list:
-                    unique_name = repo.name + "-" + repo.id
+                for repo in sort_repo_list(r_list):
+                    unique_name = repo.name + "-" + repo.id[:6]
                     namelist.append(unique_name)
 
         return namelist
@@ -450,8 +453,8 @@ class RootResource(DAVCollection):
                 res = self._createRootRes(repo, repo.name)
                 member_list.append(res)
             else:
-                for repo in r_list:
-                    unique_name = repo.name + "-" + repo.id
+                for repo in sort_repo_list(r_list):
+                    unique_name = repo.name + "-" + repo.id[:6]
                     res = self._createRootRes(repo, unique_name)
                     member_list.append(res)
 
@@ -578,7 +581,7 @@ def getRepoByName(repo_name, username):
 
     if not ret_repo:
         for repo in repos:
-            if repo.name + "-" + repo.id == repo_name:
+            if repo.name + "-" + repo.id[:6] == repo_name:
                 ret_repo = repo
                 break
         if not ret_repo:
