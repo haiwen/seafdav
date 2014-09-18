@@ -8,3 +8,4 @@ build/
 dist/
 run.sh
 /seafdav.conf
+/seafdav.fcgi.conf

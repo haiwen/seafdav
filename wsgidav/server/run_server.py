@@ -153,7 +153,7 @@ If no config file is found, a default FilesystemProvider is used."""
    
     (options, args) = parser.parse_args()
 
-    if len(args) > 0:
+    if len(args) > 1:
         parser.error("Too many arguments")
 
     if options.config_file is None:
@@ -175,7 +175,7 @@ If no config file is found, a default FilesystemProvider is used."""
         print "Command line options:"
         for k, v in cmdLineOpts.items():
             print "    %-12s: %s" % (k, v)
-    return cmdLineOpts
+    return cmdLineOpts, args
 
 
 
@@ -215,7 +215,7 @@ def _readConfigFile(config_file, verbose):
 
 def _initConfig():
     """Setup configuration dictionary from default, command line and configuration file."""
-    cmdLineOpts = _initCommandLineOptions()
+    cmdLineOpts, args = _initCommandLineOptions()
 
     # Set config defaults
     config = DEFAULT_CONFIG.copy()
@@ -284,8 +284,7 @@ def _initConfig():
             reloader.watch_file(config_file)
 #        import pydevd
 #        pydevd.settrace()
-
-    return config
+    return config, args
 
 
 
@@ -538,7 +537,7 @@ def write_pidfile(pidfile):
     atexit.register(remove_pidfile)
 
 def run():
-    config = _initConfig()
+    config, args = _initConfig()
     
     app = WsgiDAVApp(config)
     
@@ -546,6 +545,9 @@ def run():
     if pid_file_name:
         write_pidfile(pid_file_name)
     
+    if len(args) > 0 and args[0] == 'runfcgi':
+        config['ext_servers'].insert(0, "flup-fcgi_fork")
+
     # Try running WsgiDAV inside the following external servers:
     res = False
     for e in config["ext_servers"]:
