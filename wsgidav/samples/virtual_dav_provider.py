@@ -1,5 +1,5 @@
 # -*- coding: iso-8859-1 -*-
-# (c) 2009-2011 Martin Wendt and contributors; see WsgiDAV http://wsgidav.googlecode.com/
+# (c) 2009-2014 Martin Wendt and contributors; see WsgiDAV https://github.com/mar10/wsgidav
 # Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
 """
 Sample implementation of a DAV provider that provides a browsable, 
@@ -544,8 +544,9 @@ class VirtualResFile(_VirtualNonCollection):
 
     def getContent(self):
         mime = self.getContentType()
-        if mime.startswith("text"):
-            return file(self.filePath, "r", BUFFER_SIZE)
+        # GC issue 57: always store as binary
+#        if mime.startswith("text"):
+#            return file(self.filePath, "r", BUFFER_SIZE)
         return file(self.filePath, "rb", BUFFER_SIZE)
 
          

@@ -1,4 +1,4 @@
-# (c) 2009-2011 Martin Wendt and contributors; see WsgiDAV http://wsgidav.googlecode.com/
+# (c) 2009-2014 Martin Wendt and contributors; see WsgiDAV https://github.com/mar10/wsgidav
 # Original PyFileServer (c) 2005 Ho Chun Wei.
 # Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
 """
@@ -6,7 +6,7 @@ WSGI application that handles one single WebDAV request.
 
 See `Developers info`_ for more information about the WsgiDAV architecture.
 
-.. _`Developers info`: http://docs.wsgidav.googlecode.com/hg/html/develop.html  
+.. _`Developers info`: http://wsgidav.readthedocs.org/en/latest/develop.html  
 """
 from urlparse import urlparse
 from wsgidav.dav_error import HTTP_OK, HTTP_LENGTH_REQUIRED
@@ -38,7 +38,7 @@ __docformat__ = "reStructuredText"
 
 _logger = util.getModuleLogger(__name__)
 
-BLOCK_SIZE = 8192
+DEFAULT_BLOCK_SIZE = 8192
 
 
 
@@ -49,9 +49,20 @@ class RequestServer(object):
 
     def __init__(self, davProvider):
         self._davProvider = davProvider
-        self.allowPropfindInfinite = True
+        self.allowPropfindInfinite = False
         self._verbose = 2
+        self.block_size = DEFAULT_BLOCK_SIZE
         util.debug("RequestServer: __init__", module="sc")
+
+        self._possible_methods = [ "OPTIONS", "HEAD", "GET", "PROPFIND" ]
+        # if self._davProvider.propManager is not None:
+        #     self._possible_methods.extend( [ "PROPFIND" ] )
+        if not self._davProvider.isReadOnly():
+            self._possible_methods.extend( [ "PUT", "DELETE", "COPY", "MOVE", "MKCOL", "PROPPATCH" ] )
+            # if self._davProvider.propManager is not None:
+            #     self._possible_methods.extend( [ "PROPPATCH" ] )
+            if self._davProvider.lockManager is not None:
+                self._possible_methods.extend( [ "LOCK", "UNLOCK" ] )
 
     def __del__(self):
         util.debug("RequestServer: __del__", module="sc")
@@ -66,6 +77,8 @@ class RequestServer(object):
         environ["wsgidav.username"] = environ.get("http_authenticator.username", "anonymous") 
         requestmethod =  environ["REQUEST_METHOD"]
 
+        self.block_size = environ["wsgidav.config"].get("block_size", DEFAULT_BLOCK_SIZE)
+
         # Convert 'infinity' and 'T'/'F' to a common case
         if environ.get("HTTP_DEPTH") is not None: 
             environ["HTTP_DEPTH"] = environ["HTTP_DEPTH"].lower() 
@@ -76,7 +89,9 @@ class RequestServer(object):
             pass
         
         # Dispatch HTTP request methods to 'doMETHOD()' handlers
-        method = getattr(self, "do%s" % requestmethod, None)
+        method = None
+        if requestmethod in self._possible_methods:
+            method = getattr(self, "do%s" % requestmethod, None)
         if not method:
             self._fail(HTTP_METHOD_NOT_ALLOWED)
 
@@ -91,12 +106,16 @@ class RequestServer(object):
             profile.print_stats(sort=2)
             for v in res:
                 yield v
+            if hasattr(res, "close"):
+                res.close()
             return
   
-        for v in method(environ, start_response):
+        app_iter = method(environ, start_response)
+        for v in app_iter:
             yield v
+        if hasattr(app_iter, "close"):
+            app_iter.close()
         return
-#        return method(environ, start_response)
 
 
     def _fail(self, value, contextinfo=None, srcexception=None, errcondition=None):
@@ -634,13 +653,15 @@ class RequestServer(object):
             (environ.get("HTTP_TRANSFER_ENCODING", "").lower() != "chunked")
         ):
             # HOTFIX: not fully understood, but MS sends PUT without content-length,
-            # when creating new files 
-            # if "Microsoft-WebDAV-MiniRedir" in environ.get("HTTP_USER_AGENT", ""):
-            #     _logger.warning("Setting misssing Content-Length to 0 for MS client")
+            # when creating new files
+
+            # agent = environ.get("HTTP_USER_AGENT", "")
+            # if "Microsoft-WebDAV-MiniRedir" in agent or "gvfs/" in agent: # issue #10
+            #     _logger.warning("Setting misssing Content-Length to 0 for MS / gvfs client")
             #     contentlength = 0
             # else:
-                # self._fail(HTTP_LENGTH_REQUIRED, 
-                #            "PUT request with invalid Content-Length: (%s)" % environ.get("CONTENT_LENGTH"))
+            #     self._fail(HTTP_LENGTH_REQUIRED, 
+            #                "PUT request with invalid Content-Length: (%s)" % environ.get("CONTENT_LENGTH"))
             contentlength = 0
         
         hasErrors = False
@@ -693,7 +714,7 @@ class RequestServer(object):
                 assert contentlength > 0
                 contentremain = contentlength
                 while contentremain > 0:
-                    n = min(contentremain, BLOCK_SIZE)
+                    n = min(contentremain, self.block_size)
                     readbuffer = environ["wsgi.input"].read(n)
                     # This happens with litmus expect-100 test:
 #                    assert len(readbuffer) > 0, "input.read(%s) returned %s bytes" % (n, len(readbuffer))
@@ -1255,11 +1276,13 @@ class RequestServer(object):
         provider = self._davProvider
         res = provider.getResourceInst(path, environ)
 
+        dav_compliance_level = "1,2"
+        if provider is None or provider.isReadOnly() or provider.lockManager is None:
+            dav_compliance_level = "1"
+
         headers = [("Content-Type", "text/html"),
                    ("Content-Length", "0"),
-                   ("DAV", "1,2"),  # TODO: 10.1: 'OPTIONS MUST return DAV header with compliance class "1"'
-                                    # TODO: 10.1: In cases where WebDAV is only supported in part of the server namespace, an OPTIONS request to non-WebDAV resources (including "/") SHOULD NOT advertise WebDAV support
-                   ("Server", "DAV/2"),
+                   ("DAV", dav_compliance_level),
                    ("Date", util.getRfc1123Time()),
                    ]
         
@@ -1279,22 +1302,44 @@ class RequestServer(object):
             start_response("200 OK", headers)        
             return [""]  
 
-        # TODO: should we have something like provider.isReadOnly() and then omit MKCOL PUT DELETE PROPPATCH COPY MOVE?
-        # TODO: LOCK UNLOCK is only available, if lockmanager not None
+        # Determine allowed request methods
+        allow = [ "OPTIONS" ]
         if res and res.isCollection:
             # Existing collection
-            headers.append( ("Allow", "OPTIONS HEAD GET DELETE PROPFIND PROPPATCH COPY MOVE LOCK UNLOCK") )
+            allow.extend( [ "HEAD", "GET", "PROPFIND" ] )
+            # if provider.propManager is not None:
+            #     allow.extend( [ "PROPFIND" ] )
+            if not provider.isReadOnly():
+                allow.extend( [ "DELETE", "COPY", "MOVE", "PROPPATCH" ] )
+                # if provider.propManager is not None:
+                #     allow.extend( [ "PROPPATCH" ] )
+                if provider.lockManager is not None:
+                    allow.extend( [ "LOCK", "UNLOCK" ] )
         elif res:
             # Existing resource
-            headers.append( ("Allow", "OPTIONS HEAD GET PUT DELETE PROPFIND PROPPATCH COPY MOVE LOCK UNLOCK") )
+            allow.extend( [ "HEAD", "GET", "PROPFIND" ] )
+            # if provider.propManager is not None:
+            #     allow.extend( [ "PROPFIND" ] )
+            if not provider.isReadOnly():
+                allow.extend( [ "PUT", "DELETE", "COPY", "MOVE", "PROPPATCH" ] )
+                # if provider.propManager is not None:
+                #     allow.extend( [ "PROPPATCH" ] )
+                if provider.lockManager is not None:
+                    allow.extend( [ "LOCK", "UNLOCK" ] )
             if res.supportRanges(): 
                 headers.append( ("Allow-Ranges", "bytes") )
         elif provider.isCollection(util.getUriParent(path), environ):
             # A new resource below an existing collection
             # TODO: should we allow LOCK here? I think it is allowed to lock an non-existing resource
-            headers.append( ("Allow", "OPTIONS PUT MKCOL") ) 
+            if not provider.isReadOnly():
+                allow.extend( [ "PUT", "MKCOL" ] )
         else:
             self._fail(HTTP_NOT_FOUND)
+
+        headers.append( ("Allow", " ".join(allow)) )
+
+        if environ["wsgidav.config"].get("add_header_MS_Author_Via", False):
+            headers.append( ("MS-Author-Via", "DAV") )
 
         start_response("200 OK", headers)        
         return [""]
@@ -1413,8 +1458,8 @@ class RequestServer(object):
 
         contentlengthremaining = rangelength
         while 1:
-            if contentlengthremaining < 0 or contentlengthremaining > BLOCK_SIZE:
-                readbuffer = fileobj.read(BLOCK_SIZE)
+            if contentlengthremaining < 0 or contentlengthremaining > self.block_size:
+                readbuffer = fileobj.read(self.block_size)
             else:
                 readbuffer = fileobj.read(contentlengthremaining)
             yield readbuffer

@@ -1,4 +1,4 @@
-# (c) 2009-2011 Martin Wendt and contributors; see WsgiDAV http://wsgidav.googlecode.com/
+# (c) 2009-2014 Martin Wendt and contributors; see WsgiDAV https://github.com/mar10/wsgidav
 # Original PyFileServer (c) 2005 Ho Chun Wei.
 # Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
 """
@@ -6,7 +6,7 @@ Miscellaneous support functions for WsgiDAV.
 
 See `Developers info`_ for more information about the WsgiDAV architecture.
 
-.. _`Developers info`: http://docs.wsgidav.googlecode.com/hg/html/develop.html  
+.. _`Developers info`: http://wsgidav.readthedocs.org/en/latest/develop.html  
 """
 from pprint import pformat
 from wsgidav.dav_error import DAVError, HTTP_PRECONDITION_FAILED, HTTP_NOT_MODIFIED,\
@@ -62,7 +62,7 @@ logging.basicConfig(level=logging.INFO)
 
 def getRfc1123Time(secs=None):   
     """Return <secs> in rfc 1123 date/time format (pass secs=None for current date)."""
-    # issue #20: time string must be locale independent
+    # GC issue #20: time string must be locale independent
 #    return time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime(secs))
     return formatdate(timeval=secs, localtime=False, usegmt=True)
 
@@ -206,10 +206,10 @@ def initLogging(verbose=2, log_file="", enable_loggers=[]):
         logger.setLevel(logging.INFO)
     elif verbose >= 1: # standard 
         logger.setLevel(logging.WARN)
-        consoleHandler.setLevel(logging.WARN)
+        # consoleHandler.setLevel(logging.WARN)
     else: # --quiet
         logger.setLevel(logging.ERROR)
-        consoleHandler.setLevel(logging.ERROR)
+        # consoleHandler.setLevel(logging.ERROR)
 
     # Don't call the root's handlers after our custom handlers
     logger.propagate = False
@@ -389,6 +389,10 @@ def stringRepr(s):
     return "%s" % s
 
 
+def getFileExtension(path):
+    ext = os.path.splitext(url)[1]
+    return ext
+
 
 def byteNumberString(number, thousandsSep=True, partition=False, base1024=True, appendBytes=True):
     """Convert bytes into human-readable representation."""
@@ -459,7 +463,7 @@ def readAndDiscardInput(environ):
     '500 Internal error' was raised BEFORE anything was read from the request 
     stream.
 
-    See issue 13, issue 23
+    See GC issue 13, issue 23
     See http://groups.google.com/group/paste-users/browse_frm/thread/fc0c9476047e9a47?hl=en
     
     Note that with persistent sessions (HTTP/1.1) we must make sure, that the
@@ -482,7 +486,7 @@ def readAndDiscardInput(environ):
     
     wsgi_input = environ["wsgi.input"]
 
-    # TODO: check if still required after issue 24 is fixed 
+    # TODO: check if still required after GC issue 24 is fixed 
     if hasattr(wsgi_input, "_consumed") and hasattr(wsgi_input, "length"): 
         # Seems to be Paste's httpserver.LimitedLengthFile
         # see http://groups.google.com/group/paste-users/browse_thread/thread/fc0c9476047e9a47/aa4a3aa416016729?hl=en&lnk=gst&q=.input#aa4a3aa416016729
@@ -519,6 +523,35 @@ def readAndDiscardInput(environ):
             sock.settimeout(timeout)
         except:
             warn("--> wsgi_input.read(): %s" % sys.exc_info())
+
+
+#===============================================================================
+# SubAppStartResponse
+#===============================================================================
+class SubAppStartResponse(object):
+    def __init__(self):
+        self.__status = ""
+        self.__response_headers = []
+        self.__exc_info = None
+
+        super(SubAppStartResponse, self).__init__()
+
+    @property
+    def status(self):
+        return self.__status
+
+    @property
+    def response_headers(self):
+        return self.__response_headers
+
+    @property
+    def exc_info(self):
+        return self.__exc_info
+
+    def __call__(self, status, response_headers, exc_info=None):
+        self.__status = status
+        self.__response_headers = response_headers
+        self.__exc_info = exc_info
 
 
 
@@ -1124,6 +1157,7 @@ def testIfHeaderDict(davres, dictIf, fullurl, locktokenlist, entitytag):
     return False
 
 testIfHeaderDict.__test__ = False # Tell nose to ignore this function
+
 
 #===============================================================================
 # guessMimeType

@@ -1,11 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright 2013 Seafile, Inc
-# Licensed under the terms of seafile-pro-license.txt.
-# You are not allowed to modify or redistribute this file.
-#
-
 import os
 
 def get_seafile_conf_dir():
@@ -31,7 +26,7 @@ CCNET_CONF_DIR = get_ccnet_conf_dir()
 def utf8_wrap(s):
     if isinstance(s, unicode):
         s = s.encode('utf-8')
-    
+
     return s
 
 class UTF8Dict(dict):
@@ -41,15 +36,14 @@ class UTF8Dict(dict):
     '''
     def __init__(self):
         dict.__init__(self)
-        
+
     def __setitem__(self, k, v):
         dict.__setitem__(self, utf8_wrap(k), v)
-        
+
     def __getitem__(self, k):
         return dict.__getitem__(self, utf8_wrap(k))
 
-        
+
 def utf8_path_join(*args):
     args = [ utf8_wrap(arg) for arg in args ]
     return os.path.join(*args)
-    

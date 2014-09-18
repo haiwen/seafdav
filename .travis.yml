@@ -1,0 +1,17 @@
+language: python
+before_install:
+  # build/init/start ccnet-server/seafile-server
+  - git clone --depth=1 --branch=master git://github.com/haiwen/seafile-test-deploy /tmp/seafile-test-deploy
+  - cd /tmp/seafile-test-deploy && ./bootstrap.sh && cd -
+  - git clone --depth=1 --branch=master git://github.com/haiwen/seafobj /tmp/seafobj && mv /tmp/seafobj/seafobj .
+script:
+  - ./functests.sh init && ./functests.sh runserver && ./functests.sh test
+env:
+  - CCNET_CONF_DIR=/tmp/ccnet SEAFILE_CONF_DIR=/tmp/seafile-data
+install:
+  - pip install -r requirements.txt
+  - pip install -r test-requirements.txt
+notifications:
+  email:
+    recipients:
+      - linshuai2012@gmail.com

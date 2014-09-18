@@ -11,7 +11,7 @@ defaultdigest = False
 
 share_name = '/'
 # haiwen
-#   - pro-data
+#   - conf
 #     - seafdav.conf
 #   - seafile-pro-server-1.8.0
 #     - pro

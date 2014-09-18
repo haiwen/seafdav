@@ -1,8 +1,3 @@
-# Copyright 2013 Seafile, Inc
-# Licensed under the terms of seafile-pro-license.txt.
-# You are not allowed to modify or redistribute this file.
-#
-
 import os
 import ccnet
 from pysearpc import SearpcError

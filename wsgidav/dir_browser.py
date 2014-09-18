@@ -1,4 +1,4 @@
-# (c) 2009-2011 Martin Wendt and contributors; see WsgiDAV http://wsgidav.googlecode.com/
+# (c) 2009-2014 Martin Wendt and contributors; see WsgiDAV https://github.com/mar10/wsgidav
 # Original PyFileServer (c) 2005 Ho Chun Wei.
 # Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
 """
@@ -6,10 +6,12 @@ WSGI middleware that handles GET requests on collections to display directories.
 
 See `Developers info`_ for more information about the WsgiDAV architecture.
 
-.. _`Developers info`: http://docs.wsgidav.googlecode.com/hg/html/develop.html  
+.. _`Developers info`: http://wsgidav.readthedocs.org/en/latest/develop.html  
 """
 from wsgidav.dav_error import DAVError, HTTP_OK, HTTP_MEDIATYPE_NOT_SUPPORTED
 from wsgidav.version import __version__
+from middleware import BaseMiddleware
+import os
 import sys
 import urllib
 import util
@@ -17,10 +19,99 @@ import util
 __docformat__ = "reStructuredText"
 
 
-class WsgiDavDirBrowser(object):
+
+msOfficeTypeToExtMap = {
+    "excel": ("xls", "xlt", "xlm", "xlsm", "xlsx", "xltm", "xltx"),
+    "powerpoint": ("pps", "ppt", "pptm", "pptx", "potm", "potx", "ppsm", "ppsx"),
+    "word": ("doc", "dot", "docm", "docx", "dotm", "dotx"),
+    "visio": ("vsd", "vsdm", "vsdx", "vstm", "vstx"),
+}
+msOfficeExtToTypeMap = {}
+for t, el in msOfficeTypeToExtMap.iteritems():
+    for e in el:
+        msOfficeExtToTypeMap[e] = t
+
+
+PAGE_CSS = """\
+    img { border: 0; padding: 0 2px; vertical-align: text-bottom; }
+    th, td { padding: 2px 20px 2px 2px; }
+    th { text-align: left; }
+    th.right { text-align: right; }
+    td  { font-family: monospace; vertical-align: bottom; white-space: pre; }
+    td.right { text-align: right; }
+    table { border: 0; }
+    a.symlink { font-style: italic; }
+    p.trailer { font-size: smaller; }
+"""
+
+
+PAGE_SCRIPT = """\
+function onLoad() {
+//    console.log("loaded.");
+}
+
+/* Event delegation handler for clicks on a-tags with class 'msoffice'. */
+function onClickTable(event) {
+    var target = event.target || event.srcElement,
+        href = target.href;
+    
+    if( href && target.className === "msoffice" ){
+        if( openWithSharePointPlugin(href) ){
+            // prevent default processing
+            return false;        
+        }
+    }
+}
+
+function openWithSharePointPlugin(url) {
+    var res = false,
+        control = null,
+        isFF = false;
+
+    // Get the most recent version of the SharePoint plugin
+    if( window.ActiveXObject ){
+        try {
+            control = new ActiveXObject("SharePoint.OpenDocuments.3"); // Office 2007
+        } catch(e) {
+            try {
+                control = new ActiveXObject("SharePoint.OpenDocuments.2"); // Office 2003
+            } catch(e2) {
+                try {
+                    control = new ActiveXObject("SharePoint.OpenDocuments.1"); // Office 2000/XP
+                } catch(e3) {
+                    window.console && console.warn("Could not create ActiveXObject('SharePoint.OpenDocuments'). Check your browsers security settings.");
+                    return false;
+                }
+            }
+        }
+        if( !control ){
+            window.console && console.warn("Cannot instantiate the required ActiveX control to open the document. This is most likely because you do not have Office installed or you have an older version of Office.");
+        }
+    } else {
+        window.console && console.log("Non-IE: using FFWinPlugin Plug-in...");
+        control = document.getElementById("winFirefoxPlugin");
+        isFF = true;
+    }
+
+    try {
+//      window.console && console.log("SharePoint.OpenDocuments.EditDocument('" + url + "')...");
+        res = control.EditDocument(url);
+//      window.console && console.log("SharePoint.OpenDocuments.EditDocument('" + url + "')... res = ", res);
+        if( !res ){
+            window.console && console.warn("SharePoint.OpenDocuments.EditDocument('" + url + "') returned false.");
+        }
+    } catch (e){
+        window.console && console.warn("SharePoint.OpenDocuments.EditDocument('" + url + "') failed.", e);
+    }
+    return res;
+}
+"""
+
+
+class WsgiDavDirBrowser(BaseMiddleware):
     """WSGI middleware that handles GET requests on collections to display directories."""
 
-    def __init__(self, application):
+    def __init__(self, application, config):
         self._application = application
         self._verbose = 2
 
@@ -77,6 +168,10 @@ class WsgiDavDirBrowser(object):
         
         return self._application(environ, start_response)
 
+    @staticmethod
+    def isSuitable(config):
+        return config.get("dir_browser") and config["dir_browser"].get("enable", True)
+
 
     def _fail(self, value, contextinfo=None, srcexception=None, errcondition=None):
         """Wrapper to raise (and log) DAVError."""
@@ -94,14 +189,15 @@ class WsgiDavDirBrowser(object):
         
         dirConfig = environ["wsgidav.config"].get("dir_browser", {})
         displaypath = urllib.unquote(davres.getHref())
+        isReadOnly = environ["wsgidav.provider"].isReadOnly()
 
         trailer = dirConfig.get("response_trailer")
         if trailer:
             trailer = trailer.replace("${version}", 
-                "<a href='http://wsgidav.googlecode.com/'>WsgiDAV/%s</a>" % __version__)
+                "<a href='https://github.com/mar10/wsgidav/'>WsgiDAV/%s</a>" % __version__)
             trailer = trailer.replace("${time}", util.getRfc1123Time())
         else:
-            trailer = ("<a href='http://wsgidav.googlecode.com/'>WsgiDAV/%s</a> - %s" 
+            trailer = ("<a href='https://github.com/mar10/wsgidav/'>WsgiDAV/%s</a> - %s" 
                        % (__version__, util.getRfc1123Time()))
 
         
@@ -113,26 +209,18 @@ class WsgiDavDirBrowser(object):
         html.append("<meta name='generator' content='WsgiDAV %s'>" % __version__)
         html.append("<title>WsgiDAV - Index of %s </title>" % displaypath)
         
-        html.append("""\
-<style type="text/css">
-    img { border: 0; padding: 0 2px; vertical-align: text-bottom; }
-    th, td { padding: 2px 20px 2px 2px; }
-    th { text-align: left; }
-    th.right { text-align: right; }
-    td  { font-family: monospace; vertical-align: bottom; white-space: pre; }
-    td.right { text-align: right; }
-    table { border: 0; }
-    a.symlink { font-style: italic; }
-    p.trailer { font-size: smaller; }
-</style>""")        
+        html.append("<script type='text/javascript'>%s</script>" % PAGE_SCRIPT)
+        html.append("<style type='text/css'>%s</style>" % PAGE_CSS)
+
         # Special CSS to enable MS Internet Explorer behaviour
-        if dirConfig.get("msmount"):
-            html.append("""\
-<style type="text/css">
-    A {behavior: url(#default#AnchorClick);}
-</style>""")
+        if dirConfig.get("ms_mount"):
+            html.append("<style type='text/css'> A {behavior: url(#default#AnchorClick);} </style>")
         
-        html.append("</head><body>")
+        if dirConfig.get("ms_sharepoint_plugin"):
+            html.append("<object id='winFirefoxPlugin' type='application/x-sharepoint' width='0' height='0' style=''visibility: hidden;'></object>")
+
+        html.append("</head>")
+        html.append("<body onload='onLoad()'>")
 
         # Title
         html.append("<h1>Index of %s</h1>" % displaypath)
@@ -140,7 +228,7 @@ class WsgiDavDirBrowser(object):
         links = []
         if dirConfig.get("davmount"):
             links.append("<a title='Open this folder in a WebDAV client.' href='%s?davmount'>Mount</a>" % util.makeCompleteUrl(environ))
-        if dirConfig.get("msmount"):
+        if dirConfig.get("ms_mount"):
             links.append("<a title='Open as Web Folder (requires Microsoft Internet Explorer)' href='' FOLDER='%s'>Open as Web Folder</a>" % util.makeCompleteUrl(environ))
 #                html.append("<a href='' FOLDER='%ssetup.py'>Open setup.py as WebDAV</a>" % util.makeCompleteUrl(environ))
         if links:
@@ -148,7 +236,7 @@ class WsgiDavDirBrowser(object):
 
         html.append("<hr>")
         # Listing
-        html.append("<table>")
+        html.append("<table onclick='return onClickTable(event)'>")
 
         html.append("<thead>")
         html.append("<tr><th>Name</th> <th>Type</th> <th class='right'>Size</th> <th class='right'>Last modified</th> </tr>")
@@ -170,7 +258,9 @@ class WsgiDavDirBrowser(object):
             childList = davres.getDescendants(depth="1", addSelf=False)
             for res in childList:
                 di = res.getDisplayInfo()
-                infoDict = {"href": res.getHref(),
+                href = res.getHref()
+                infoDict = {"href": href,
+                            "class": "",
                             "displayName": res.getDisplayName(),
                             "lastModified": res.getLastModified(),
                             "isCollection": res.isCollection,
@@ -178,6 +268,18 @@ class WsgiDavDirBrowser(object):
                             "displayType": di.get("type"),
                             "displayTypeComment": di.get("typeComment"),
                             }
+
+                if not isReadOnly and not res.isCollection:
+                    ext = os.path.splitext(href)[1].lstrip(".").lower()
+                    officeType = msOfficeExtToTypeMap.get(ext)
+                    if officeType:
+                        # print "OT", officeType
+                        # print "OT", dirConfig
+                        if dirConfig.get("ms_sharepoint_plugin"):
+                            infoDict["class"] = "msoffice"
+                        elif dirConfig.get("ms_sharepoint_urls"):
+                            infoDict["href"] = "ms-%s:ofe|u|%s" % (officeType, href)
+
                 dirInfoList.append(infoDict)
         # 
         for infoDict in dirInfoList:
@@ -194,7 +296,7 @@ class WsgiDavDirBrowser(object):
                     infoDict["strSize"] = util.byteNumberString(contentLength)
 
             html.append("""\
-            <tr><td><a href="%(href)s">%(displayName)s</a></td>
+            <tr><td><a href="%(href)s" class="%(class)s">%(displayName)s</a></td>
             <td>%(displayType)s</td>
             <td class='right'>%(strSize)s</td>
             <td class='right'>%(strModified)s</td></tr>""" % infoDict)
@@ -214,8 +316,6 @@ class WsgiDavDirBrowser(object):
 
         if trailer:
             html.append("<p class='trailer'>%s</p>" % trailer)
-#            html.append("<p class='trailer'><a href='http://wsgidav.googlecode.com/'>WsgiDAV/%s</a> - %s</p>" 
-#                          % (__version__, util.getRfc1123Time()))
 
         html.append("</body></html>")
 

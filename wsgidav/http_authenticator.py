@@ -1,4 +1,4 @@
-# (c) 2009-2011 Martin Wendt and contributors; see WsgiDAV http://wsgidav.googlecode.com/
+# (c) 2009-2014 Martin Wendt and contributors; see WsgiDAV https://github.com/mar10/wsgidav
 # Original PyFileServer (c) 2005 Ho Chun Wei.
 # Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
 """
@@ -75,7 +75,7 @@ from previous middleware or server config (if required).
 
 See `Developers info`_ for more information about the WsgiDAV architecture.
 
-.. _`Developers info`: http://docs.wsgidav.googlecode.com/hg/html/develop.html  
+.. _`Developers info`: http://wsgidav.readthedocs.org/en/latest/develop.html  
 """
 __docformat__ = "reStructuredText"
 
@@ -88,6 +88,8 @@ except ImportError:
 import time
 import re
 import util
+from domain_controller import WsgiDAVDomainController
+from middleware import BaseMiddleware
 
 _logger = util.getModuleLogger(__name__, True)
 
@@ -96,6 +98,10 @@ _logger = util.getModuleLogger(__name__, True)
 # With this fix turned on, we allow '/' digests, when a matching '/dav' account
 # is present. 
 HOTFIX_WINXP_AcceptRootShareLogin = True
+
+# HOTFIX for Windows 
+# MW 2013-12-31: DON'T set this (will MS office to use anonymous always in some scenarios)
+HOTFIX_WIN_AcceptAnonymousOptions = False
 
 
 class SimpleDomainController(object):
@@ -130,25 +136,44 @@ class SimpleDomainController(object):
 #===============================================================================
 # HTTPAuthenticator
 #===============================================================================
-class HTTPAuthenticator(object):
+class HTTPAuthenticator(BaseMiddleware):
     """WSGI Middleware for basic and digest authenticator."""
-    def __init__(self, application, domaincontroller, acceptbasic=True, acceptdigest=True, defaultdigest=True):
-        self._domaincontroller = domaincontroller
+    def __init__(self, application, config):
+        self._verbose = config.get("verbose", 2)
         self._application = application
+        self._user_mapping = config.get("user_mapping", {})
+        self._domaincontroller = config.get("domaincontroller") or WsgiDAVDomainController(self._user_mapping)
+        self._acceptbasic = config.get("acceptbasic", True)
+        self._acceptdigest = config.get("acceptdigest", True)
+        self._defaultdigest = config.get("defaultdigest", True)
         self._noncedict = dict([])
 
         self._headerparser = re.compile(r"([\w]+)=([^,]*),")
         self._headermethod = re.compile(r"^([\w]+)")
         
-        self._acceptbasic = acceptbasic
-        self._acceptdigest = acceptdigest
-        self._defaultdigest = defaultdigest
+        wdcName = "NTDomainController"
+        if self._domaincontroller.__class__.__name__ == wdcName:
+            if self._authacceptdigest or self._authdefaultdigest or not self._authacceptbasic:
+                util.warn("WARNING: %s requires basic authentication.\n\tSet acceptbasic=True, acceptdigest=False, defaultdigest=False" % wdcName)
 
-   
+    def getDomainController(self):
+        return self._domaincontroller
+
+    def allowAnonymousAccess(self, share):
+        return isinstance(self._domaincontroller, WsgiDAVDomainController) and not self._user_mapping.get(share)
+
     def __call__(self, environ, start_response):
         realmname = self._domaincontroller.getDomainRealm(environ["PATH_INFO"], environ)
         
-        if not self._domaincontroller.requireAuthentication(realmname, environ):
+        _logger.debug("realm '%s'" % realmname)
+        # _logger.debug("%s" % environ)
+
+        force_allow = False
+        if HOTFIX_WIN_AcceptAnonymousOptions and environ["REQUEST_METHOD"] == "OPTIONS":
+            _logger.warning("No authorization required for OPTIONS method")
+            force_allow = True
+
+        if force_allow or not self._domaincontroller.requireAuthentication(realmname, environ):
             # no authentication needed
             _logger.debug("No authorization required for realm '%s'" % realmname)
             environ["http_authenticator.realm"] = realmname
@@ -361,6 +386,8 @@ class HTTPAuthenticator(object):
             digestresp = self.md5kd( self.md5h(A1), nonce + ":" + nc + ":" + cnonce + ":" + qop + ":" + self.md5h(A2))
         else:
             digestresp = self.md5kd( self.md5h(A1), nonce + ":" + self.md5h(A2))
+        # print A1, A2
+        # print digestresp
         return digestresp
                 
     

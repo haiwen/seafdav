@@ -1,4 +1,4 @@
-# (c) 2009-2011 Martin Wendt and contributors; see WsgiDAV http://wsgidav.googlecode.com/
+# (c) 2009-2014 Martin Wendt and contributors; see WsgiDAV https://github.com/mar10/wsgidav
 # Original PyFileServer (c) 2005 Ho Chun Wei.
 # Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
 """
@@ -17,7 +17,7 @@ The properties dictionaray is built like::
 
 See `Developers info`_ for more information about the WsgiDAV architecture.
 
-.. _`Developers info`: http://docs.wsgidav.googlecode.com/hg/html/develop.html  
+.. _`Developers info`: http://wsgidav.readthedocs.org/en/latest/develop.html  
 """
 from wsgidav import util
 import os
@@ -337,3 +337,17 @@ class ShelvePropertyManager(PropertyManager):
         finally:
             self._lock.release()         
 
+    def clear(self):
+        """Delete all entries."""
+        self._lock.acquireWrite() 
+        try:
+            was_closed = self._dict is None
+            if was_closed:
+                self.open()
+            if len(self._dict):
+                self._dict.clear()
+                self._dict.sync()
+            if was_closed:
+                self.close()
+        finally:
+            self._lock.release()

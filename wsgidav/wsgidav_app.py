@@ -1,4 +1,4 @@
-# (c) 2009-2011 Martin Wendt and contributors; see WsgiDAV http://wsgidav.googlecode.com/
+# (c) 2009-2014 Martin Wendt and contributors; see WsgiDAV https://github.com/mar10/wsgidav
 # Original PyFileServer (c) 2005 Ho Chun Wei.
 # Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
 """
@@ -39,7 +39,7 @@ For every request:
 
 See `Developers info`_ for more information about the WsgiDAV architecture.
 
-.. _`Developers info`: http://docs.wsgidav.googlecode.com/hg/html/develop.html  
+.. _`Developers info`: http://wsgidav.readthedocs.org/en/latest/develop.html  
 """
 from fs_dav_provider import FilesystemProvider
 from wsgidav.dir_browser import WsgiDavDirBrowser
@@ -54,7 +54,6 @@ from error_printer import ErrorPrinter
 from debug_filter import WsgiDavDebugFilter
 from http_authenticator import HTTPAuthenticator
 from request_resolver import RequestResolver
-from domain_controller import WsgiDAVDomainController
 from property_manager import PropertyManager
 from lock_manager import LockManager
 #from wsgidav.version import __version__
@@ -76,8 +75,9 @@ DEFAULT_CONFIG = {
                    "wsgidav",
                    ],
 
-    "enable_loggers": [
-                      ],
+    "add_header_MS_Author_Via": True,
+    "unquote_path_info": False, # See #8
+#    "use_text_files": False,
 
     "propsmanager": None,  # True: use property_manager.PropertyManager                  
     "locksmanager": True,  # True: use lock_manager.LockManager    
@@ -88,22 +88,35 @@ DEFAULT_CONFIG = {
     "acceptbasic": True,      # Allow basic authentication, True or False
     "acceptdigest": True,     # Allow digest authentication, True or False
     "defaultdigest": True,    # True (default digest) or False (default basic)
+
+    # Error printer options
+    "catchall": False,
     
+    "enable_loggers": [
+                      ],
+
     # Verbose Output
-    "verbose": 2,        # 0 - no output (excepting application exceptions)         
+    "verbose": 1,        # 0 - no output (excepting application exceptions)         
                          # 1 - show single line request summaries (for HTTP logging)
                          # 2 - show additional events
                          # 3 - show full request/response header info (HTTP Logging)
                          #     request body and GET response bodies not shown
     
     "dir_browser": {
-        "enable": True,          # Render HTML listing for GET requests on collections
-        "response_trailer": "",  # Raw HTML code, appended as footer
-        "davmount": False,       # Send <dm:mount> response if request URL contains '?davmount'
-        "msmount": False,        # Add an 'open as webfolder' link (requires Windows)
-    }
+        "enable": True,               # Render HTML listing for GET requests on collections
+        "response_trailer": "",       # Raw HTML code, appended as footer
+        "davmount": False,            # Send <dm:mount> response if request URL contains '?davmount'
+        "ms_mount": False,            # Add an 'open as webfolder' link (requires Windows)
+        "ms_sharepoint_plugin": True, # Invoke MS Offce documents for editing using WebDAV
+        "ms_sharepoint_urls": False,  # Prepend 'ms-word:ofe|u|' to URL for MS Offce documents
+    },
+    "middleware_stack": [
+        WsgiDavDirBrowser,
+        HTTPAuthenticator,
+        ErrorPrinter,
+        WsgiDavDebugFilter,
+    ]
 }
-
 
 
 
@@ -155,22 +168,6 @@ class WsgiDAVApp(object):
 
         mount_path = config.get("mount_path")
          
-        user_mapping = self.config.get("user_mapping", {})
-        domainController = config.get("domaincontroller") or WsgiDAVDomainController(user_mapping)
-        isDefaultDC = isinstance(domainController, WsgiDAVDomainController)
-
-        # authentication fields
-        authacceptbasic = config.get("acceptbasic", True)
-        authacceptdigest = config.get("acceptdigest", True)
-        authdefaultdigest = config.get("defaultdigest", True)
-        
-        # Check configuration for NTDomainController
-        # We don't use 'isinstance', because include would fail on non-windows boxes.
-        wdcName = "NTDomainController"
-        if domainController.__class__.__name__ == wdcName:
-            if authacceptdigest or authdefaultdigest or not authacceptbasic:
-                util.warn("WARNING: %s requires basic authentication.\n\tSet acceptbasic=True, acceptdigest=False, defaultdigest=False" % wdcName)
-                
         # Instantiate DAV resource provider objects for every share
         self.providerMap = {}
         for (share, provider) in provider_mapping.items():
@@ -192,42 +189,54 @@ class WsgiDAVApp(object):
             provider.setLockManager(locksManager)
             provider.setPropManager(propsManager)
             
-            self.providerMap[share] = provider
+            self.providerMap[share] = {"provider": provider, "allow_anonymous": False}
             
 
-        if self._verbose >= 2:
-            print "Using lock manager: %r" % locksManager
-            print "Using property manager: %r" % propsManager
-            print "Using domain controller: %s" % domainController
-            print "Registered DAV providers:"
-            for share, provider in self.providerMap.items():
-                hint = ""
-                if isDefaultDC and not user_mapping.get(share):
-                    hint = " (anonymous)"
-                print "  Share '%s': %s%s" % (share, provider, hint)
-
-        # If the default DC is used, emit a warning for anonymous realms
-        if isDefaultDC and self._verbose >= 1:
-            for share in self.providerMap:
-                if not user_mapping.get(share):
-                    # TODO: we should only warn here, if --no-auth is not given
-                    print "WARNING: share '%s' will allow anonymous access." % share
-
+        
         # Define WSGI application stack
         application = RequestResolver()
         
-        if config.get("dir_browser") and config["dir_browser"].get("enable", True):
-            application = config["dir_browser"].get("app_class", WsgiDavDirBrowser)(application)
+        domain_controller = None
+        dir_browser = config.get("dir_browser", {})
+        middleware_stack = config.get("middleware_stack", [])
 
-        application = HTTPAuthenticator(application, 
-                                        domainController, 
-                                        authacceptbasic, 
-                                        authacceptdigest, 
-                                        authdefaultdigest)      
-        application = ErrorPrinter(application, catchall=True)
-
-        application = WsgiDavDebugFilter(application, config)
         
+        # Replace WsgiDavDirBrowser to custom class for backward compatibility only
+        # In normal way you should insert it into middleware_stack
+        if dir_browser.get("enable", True) and "app_class" in dir_browser.keys():
+            config["middleware_stack"] = [m if m != WsgiDavDirBrowser else dir_browser['app_class'] for m in middleware_stack]
+
+        for mw in middleware_stack:
+            if mw.isSuitable(config):
+                if self._verbose >= 2:
+                        print "Middleware %s is suitable" % mw
+                application = mw(application, config)
+                
+                if issubclass(mw, HTTPAuthenticator):
+                    domain_controller = application.getDomainController()
+                    # check anonymous access
+                    for share, data in self.providerMap.items():
+                        if application.allowAnonymousAccess(share):
+                            data['allow_anonymous'] = True
+            else:
+                if self._verbose >= 2:
+                        print "Middleware %s is not suitable" % mw
+                    
+        # Print info
+        if self._verbose >= 2:
+            print "Using lock manager: %r" % locksManager
+            print "Using property manager: %r" % propsManager
+            print "Using domain controller: %s" % domain_controller
+            print "Registered DAV providers:"
+            for share, data in self.providerMap.items():
+                hint = " (anonymous)" if data['allow_anonymous'] else ""
+                print "  Share '%s': %s%s" % (share, provider, hint)
+        if self._verbose >= 1:
+            for share, data in self.providerMap.items():
+                if data['allow_anonymous']:
+                    # TODO: we should only warn here, if --no-auth is not given
+                    print "WARNING: share '%s' will allow anonymous access." % share
+
         self._application = application
 
 
@@ -235,10 +244,12 @@ class WsgiDAVApp(object):
 
 #        util.log("SCRIPT_NAME='%s', PATH_INFO='%s'" % (environ.get("SCRIPT_NAME"), environ.get("PATH_INFO")))
         
-        # We unquote PATH_INFO here, although this should already be done by
-        # the server.
-        path = urllib.unquote(environ["PATH_INFO"])
-        # issue 22: Pylons sends root as u'/' 
+        # We optionall unquote PATH_INFO here, although this should already be 
+        # done by the server (#8).
+        path = environ["PATH_INFO"]
+        if self.config.get("unquote_path_info", False):
+            path = urllib.unquote(environ["PATH_INFO"])
+        # GC issue 22: Pylons sends root as u'/' 
         if isinstance(path, unicode):
             util.log("Got unicode PATH_INFO: %r" % path)
             path = path.encode("utf8")
@@ -265,13 +276,12 @@ class WsgiDAVApp(object):
                 share = r
                 break
         
-        provider = self.providerMap.get(share)
+        share_data = self.providerMap.get(share)
         
         # Note: we call the next app, even if provider is None, because OPTIONS 
         #       must still be handled.
         #       All other requests will result in '404 Not Found'  
-        environ["wsgidav.provider"] = provider
-
+        environ["wsgidav.provider"] = share_data['provider']
         # TODO: test with multi-level realms: 'aa/bb'
         # TODO: test security: url contains '..'
         
@@ -321,7 +331,7 @@ class WsgiDAVApp(object):
                 util.warn("Invalid Content-Length header in response (%r): closing connection" % headerDict.get("content-length"))
                 forceCloseConnection = True
             
-            # HOTFIX for Vista and Windows 7 (issue 13, issue 23)
+            # HOTFIX for Vista and Windows 7 (GC issue 13, issue 23)
             # It seems that we must read *all* of the request body, otherwise
             # clients may miss the response.
             # For example Vista MiniRedir didn't understand a 401 response, 
@@ -383,6 +393,10 @@ class WsgiDAVApp(object):
             return start_response(status, response_headers, exc_info)
             
         # Call next middleware
-        for v in self._application(environ, _start_response_wrapper):
+        app_iter = self._application(environ, _start_response_wrapper)
+        for v in app_iter:
             yield v
+        if hasattr(app_iter, "close"):
+            app_iter.close()
+        
         return

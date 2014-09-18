@@ -1,5 +1,5 @@
 # -*- coding: iso-8859-1 -*-
-# (c) 2009-2011 Martin Wendt and contributors; see WsgiDAV http://wsgidav.googlecode.com/
+# (c) 2009-2014 Martin Wendt and contributors; see WsgiDAV https://github.com/mar10/wsgidav
 # Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
 """
 DAV provider that publishes a Mercurial repository.
@@ -312,8 +312,9 @@ class HgResource(_DAVResource):
         assert not self.isCollection
         self._checkWriteAccess()
         mode = "wb"
-        if contentType and contentType.startswith("text"):
-            mode = "w"
+        # GC issue 57: always store as binary
+#        if contentType and contentType.startswith("text"):
+#            mode = "w"
         return file(self.absFilePath, mode, BUFFER_SIZE)
 
     def endWrite(self, withErrors):

@@ -1,8 +1,3 @@
-# Copyright 2013 Seafile, Inc
-# Licensed under the terms of seafile-pro-license.txt.
-# You are not allowed to modify or redistribute this file.
-#
-
 from wsgidav.dav_error import DAVError, HTTP_BAD_REQUEST, HTTP_FORBIDDEN, \
     HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR
 from wsgidav.dav_provider import DAVProvider, DAVCollection, DAVNonCollection
@@ -61,6 +56,8 @@ class SeafileResource(DAVNonCollection):
         if cached_mtime:
             return cached_mtime
 
+        # XXX: What about not return last modified for files in v0 repos,
+        # since they can be too expensive sometimes?
         parent, filename = os.path.split(self.rel_path)
         mtimes = seafile_api.get_files_last_modified(self.repo.id, parent, -1)
         for mtime in mtimes:

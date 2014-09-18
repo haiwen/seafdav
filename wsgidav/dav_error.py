@@ -1,4 +1,4 @@
-# (c) 2009-2011 Martin Wendt and contributors; see WsgiDAV http://wsgidav.googlecode.com/
+# (c) 2009-2014 Martin Wendt and contributors; see WsgiDAV https://github.com/mar10/wsgidav
 # Original PyFileServer (c) 2005 Ho Chun Wei.
 # Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
 """
@@ -226,7 +226,7 @@ class DAVError(Exception):
 #        if self._server_descriptor:
 #            respbody.append(self._server_descriptor + "<hr>")
         html.append("<hr/>") 
-        html.append("<a href='http://wsgidav.googlecode.com/'>WsgiDAV/%s</a> - %s" 
+        html.append("<a href='https://github.com/mar10/wsgidav/'>WsgiDAV/%s</a> - %s" 
                     % (__version__, cgi.escape(str(datetime.datetime.now()))))
         html.append("</body></html>")
         html = "\n".join(html)
@@ -243,14 +243,15 @@ def getHttpStatusCode(v):
 
 def getHttpStatusString(v):
     """Return HTTP response string, e.g. 204 -> ('204 No Content').
+    The return string always includes descriptive text, to satisfy Apache mod_dav.
     
     `v`: status code or DAVError 
     """
     code = getHttpStatusCode(v)
     try:
         return ERROR_DESCRIPTIONS[code]
-    except:
-        return str(code)
+    except KeyError:
+        return "%s Status" % code
 
 
 def getResponsePage(v):

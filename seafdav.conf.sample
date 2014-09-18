@@ -1,0 +1,5 @@
+[WEBDAV]
+enabled = true
+port = 8080
+fastcgi = false
+share_name = /
