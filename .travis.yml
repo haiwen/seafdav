@@ -4,6 +4,7 @@ before_install:
   - git clone --depth=1 --branch=master git://github.com/haiwen/seafile-test-deploy /tmp/seafile-test-deploy
   - cd /tmp/seafile-test-deploy && ./bootstrap.sh && cd -
   - git clone --depth=1 --branch=master git://github.com/haiwen/seafobj /tmp/seafobj && mv /tmp/seafobj/seafobj .
+  - git clone --depth=1 --branch=master git://github.com/haiwen/python-seafile /tmp/python-seafile && mv /tmp/python-seafile/seafileapi .
 script:
   - ./functests.sh init && ./functests.sh runserver && ./functests.sh test
 env:

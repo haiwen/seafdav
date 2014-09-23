@@ -666,7 +666,9 @@ class RequestServer(object):
         
         hasErrors = False
         try:      
-            fileobj = res.beginWrite(contentType=environ.get("CONTENT_TYPE"))
+            fileobj = res.beginWrite(contentType=environ.get("CONTENT_TYPE"),
+                                     isnewfile=isnewfile,
+                                     contentlength=contentlength)
 
             if environ.get("HTTP_TRANSFER_ENCODING", "").lower() == "chunked":
                 buf = environ["wsgi.input"].readline()
@@ -731,11 +733,11 @@ class RequestServer(object):
             fileobj.close()
 
         except Exception, e:
-            res.endWrite(withErrors=True)
+            res.endWrite(True)
             _logger.exception("PUT: byte copy failed")
             self._fail(e)
 
-        res.endWrite(hasErrors)
+        res.endWrite(hasErrors, isnewfile=isnewfile)
 
         if isnewfile:
             return util.sendStatusResponse(environ, start_response, HTTP_CREATED)

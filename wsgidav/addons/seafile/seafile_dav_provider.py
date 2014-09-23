@@ -9,10 +9,11 @@ import tempfile
 
 import seaserv
 from seaserv import seafile_api
+from seaserv import check_quota as check_repo_quota
 from pysearpc import SearpcError
 from seafobj import commit_mgr, fs_mgr
 from seafobj.fs import SeafFile, SeafDir
-from seaf_utils import SEAFILE_CONF_DIR, UTF8Dict, utf8_path_join, utf8_wrap
+from wsgidav.addons.seafile.seaf_utils import SEAFILE_CONF_DIR, UTF8Dict, utf8_path_join, utf8_wrap
 
 __docformat__ = "reStructuredText"
 
@@ -34,6 +35,8 @@ class SeafileResource(DAVNonCollection):
         self.rel_path = rel_path
         self.obj = obj
         self.username = environ.get("http_authenticator.username", "")
+        self.tmpfile_path = None
+        self.owner = None
 
     # Getter methods for standard live properties
     def getContentLength(self):
@@ -82,8 +85,34 @@ class SeafileResource(DAVNonCollection):
         assert not self.isCollection
         return self.obj.get_stream()
 
+    def check_repo_owner_quota(self, isnewfile=True, contentlength=-1):
+        """Check if the upload would cause the user quota be exceeded
 
-    def beginWrite(self, contentType=None):
+        `contentlength` is only positive when the client does not use "transfer-encode: chunking"
+
+        Return True if the quota would not be exceeded, otherwise return False.
+        """
+        if contentlength <= 0:
+            # When client use "transfer-encode: chunking", the content length
+            # is not included in the request headers
+            if isnewfile:
+                return check_repo_quota(self.repo.id) > 0
+            else:
+                return True
+
+        if not self.owner:
+            self.owner = seafile_api.get_repo_owner(self.repo.id)
+        self_usage = seafile_api.get_user_self_usage(self.owner)
+        share_usage = seafile_api.get_user_share_usage(self.owner)
+        quota = seafile_api.get_user_quota(self.owner)
+
+        remain = quota - self_usage - share_usage
+        if not isnewfile:
+            remain -= self.obj.size
+
+        return contentlength <= remain
+
+    def beginWrite(self, contentType=None, isnewfile=True, contentlength=-1):
         """Open content as a stream for writing.
 
         See DAVResource.beginWrite()
@@ -95,16 +124,26 @@ class SeafileResource(DAVNonCollection):
         if seafile_api.check_permission(self.repo.id, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
 
+        if not self.check_repo_owner_quota(isnewfile, contentlength):
+            raise DAVError(HTTP_FORBIDDEN, "The quota of the repo owner is exceeded")
+
         fd, path = tempfile.mkstemp(dir=self.provider.tmpdir)
         self.tmpfile_path = path
         return os.fdopen(fd, "wb")
 
-    def endWrite(self, withErrors):
+    def endWrite(self, withErrors, isnewfile=True):
         if not withErrors:
             parent, filename = os.path.split(self.rel_path)
+            contentlength = os.stat(self.tmpfile_path).st_size
+            if not self.check_repo_owner_quota(isnewfile=isnewfile, contentlength=contentlength):
+                raise DAVError(HTTP_FORBIDDEN, "The quota of the repo owner is exceeded")
             seafile_api.put_file(self.repo.id, self.tmpfile_path, parent, filename,
                                  self.username, None)
-        os.unlink(self.tmpfile_path)
+        if self.tmpfile_path:
+            try:
+                os.unlink(self.tmpfile_path)
+            finally:
+                self.tmpfile_path = None
 
     def handleDelete(self):
         if self.provider.readonly:
@@ -262,7 +301,6 @@ class SeafDirResource(DAVCollection):
         return member_list
 
     # --- Read / write ---------------------------------------------------------
-
     def createEmptyResource(self, name):
         """Create an empty (length-0) resource.
 
@@ -274,6 +312,9 @@ class SeafDirResource(DAVCollection):
 
         if seafile_api.check_permission(self.repo.id, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
+
+        if check_repo_quota(self.repo.id) < 0:
+            raise DAVError(HTTP_FORBIDDEN, "The quota of the repo owner is exceeded")
 
         try:
             seafile_api.post_empty_file(self.repo.id, self.rel_path, name, self.username)
