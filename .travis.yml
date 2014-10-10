@@ -3,10 +3,15 @@ before_install:
   # build/init/start ccnet-server/seafile-server
   - git clone --depth=1 --branch=master git://github.com/haiwen/seafile-test-deploy /tmp/seafile-test-deploy
   - cd /tmp/seafile-test-deploy && ./bootstrap.sh && cd -
-  - git clone --depth=1 --branch=master git://github.com/haiwen/seafobj /tmp/seafobj && mv /tmp/seafobj/seafobj .
   - git clone --depth=1 --branch=master git://github.com/haiwen/python-seafile /tmp/python-seafile && mv /tmp/python-seafile/seafileapi .
+  - git clone --depth=1 --branch=master git://github.com/haiwen/seafobj /tmp/seafobj && mv /tmp/seafobj/seafobj .
+  - git clone --depth=1 --branch=master git://github.com/haiwen/seahub /tmp/seahub
 script:
-  - ./functests.sh init && ./functests.sh runserver && ./functests.sh test
+  # init and run seahub. We use seahub webapi when testing seafdav.
+  - cd /tmp/seahub && pip install -r requirements.txt --allow-all-external --allow-unverified Djblets --allow-unverified PIL
+  - cd /tmp/seahub/tests && ./seahubtests.sh init && ./seahubtests.sh runserver
+  # Run seafdav tests
+  - cd $TRAVIS_BUILD_DIR && ./functests.sh init && ./functests.sh runserver && ./functests.sh test -s -v
 env:
   - CCNET_CONF_DIR=/tmp/ccnet SEAFILE_CONF_DIR=/tmp/seafile-data
 install:

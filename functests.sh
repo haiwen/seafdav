@@ -1,4 +1,7 @@
 #!/bin/bash
+
+[ -r /etc/default/seafile-server ] && . /etc/default/seafile-server
+
 : ${PYTHON=python}
 
 : ${SEAFILE_TEST_USERNAME="test@seafiletest.com"}
@@ -63,6 +66,13 @@ function run_tests() {
     fi
     exit $rvalue
 }
+
+if [[ $# < 1 ]]; then
+    echo
+    echo "Usage: ./functests.sh {init|runserver|test}"
+    echo
+    exit 1
+fi
 
 case $1 in
     "init")

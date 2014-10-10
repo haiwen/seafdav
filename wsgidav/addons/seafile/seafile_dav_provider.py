@@ -22,6 +22,8 @@ _logger = util.getModuleLogger(__name__)
 NEED_PROGRESS = 0
 SYNCHRONOUS = 1
 
+INFINITE_QUOTA = -2
+
 def sort_repo_list(repos):
     return sorted(repos, lambda r1, r2: cmp(r1.id, r2.id))
 
@@ -96,15 +98,17 @@ class SeafileResource(DAVNonCollection):
             # When client use "transfer-encode: chunking", the content length
             # is not included in the request headers
             if isnewfile:
-                return check_repo_quota(self.repo.id) > 0
+                return check_repo_quota(self.repo.id) >= 0
             else:
                 return True
 
         if not self.owner:
             self.owner = seafile_api.get_repo_owner(self.repo.id)
+        quota = seafile_api.get_user_quota(self.owner)
+        if quota == INFINITE_QUOTA:
+            return True
         self_usage = seafile_api.get_user_self_usage(self.owner)
         share_usage = seafile_api.get_user_share_usage(self.owner)
-        quota = seafile_api.get_user_quota(self.owner)
 
         remain = quota - self_usage - share_usage
         if not isnewfile:
