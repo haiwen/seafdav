@@ -1,4 +1,4 @@
-# Seafile WebDAV Server [![Build Status](https://secure.travis-ci.org/haiwen/seafdav.svg?branch=lins)](http://travis-ci.org/haiwen/seafdav)
+# Seafile WebDAV Server [![Build Status](https://secure.travis-ci.org/haiwen/seafdav.svg?branch=master)](http://travis-ci.org/haiwen/seafdav)
 
 This is the WebDAV server for seafile.
 
