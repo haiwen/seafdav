@@ -8,7 +8,7 @@ import os
 import tempfile
 
 import seaserv
-from seaserv import seafile_api
+from seaserv import seafile_api, CALC_SHARE_USAGE
 from seaserv import check_quota as check_repo_quota
 from pysearpc import SearpcError
 from seafobj import commit_mgr, fs_mgr
@@ -111,7 +111,7 @@ class SeafileResource(DAVNonCollection):
         if quota == INFINITE_QUOTA:
             return True
         self_usage = seafile_api.get_user_self_usage(self.owner)
-        share_usage = seafile_api.get_user_share_usage(self.owner)
+        share_usage = seafile_api.get_user_share_usage(self.owner) if CALC_SHARE_USAGE else 0
 
         remain = quota - self_usage - share_usage
         if not isnewfile:
