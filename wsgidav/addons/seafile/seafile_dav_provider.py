@@ -64,6 +64,9 @@ class SeafileResource(DAVNonCollection):
         if cached_mtime:
             return cached_mtime
 
+        if self.obj.mtime > 0:
+            return self.obj.mtime
+
         # XXX: What about not return last modified for files in v0 repos,
         # since they can be too expensive sometimes?
         parent, filename = os.path.split(self.rel_path)
@@ -583,14 +586,19 @@ def resolvePath(path, username):
 
     n_segs = len(segments)
     i = 0
+    parent = None
     for segment in segments:
-        obj = obj.lookup(segment)
+        parent = obj
+        obj = parent.lookup(segment)
 
         if not obj or (isinstance(obj, SeafFile) and i != n_segs-1):
             raise DAVError(HTTP_NOT_FOUND)
 
         rel_path += "/" + segment
         i += 1
+
+    if parent:
+        obj.mtime = parent.lookup_dent(segment).mtime
 
     return (repo, rel_path, obj)
 
