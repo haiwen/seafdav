@@ -469,7 +469,7 @@ class RootResource(DAVCollection):
                 namelist.append(repo.name)
             else:
                 for repo in sort_repo_list(r_list):
-                    unique_name = repo.name + "-" + repo.id[:6]
+                    unique_name = repo.name + "-" + repo.id[:6].encode('utf-8')
                     namelist.append(unique_name)
 
         return namelist
@@ -502,7 +502,7 @@ class RootResource(DAVCollection):
                 member_list.append(res)
             else:
                 for repo in sort_repo_list(r_list):
-                    unique_name = repo.name + "-" + repo.id[:6]
+                    unique_name = repo.name + "-" + repo.id[:6].encode('utf-8')
                     res = self._createRootRes(repo, unique_name)
                     member_list.append(res)
 
