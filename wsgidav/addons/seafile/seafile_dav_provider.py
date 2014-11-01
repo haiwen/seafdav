@@ -650,16 +650,18 @@ def getRepoByName(repo_name, username, org_id):
 def getAccessibleRepos(username, org_id):
     all_repos = {}
 
-    def addRepo(repo_id):
+    def addRepo(repo):
+        if isinstance(repo, basestring):
+            repo_id = repo
+            repo = None
+        else:
+            repo_id = repo.id
         try:
             if all_repos.has_key(repo_id):
                 return
-            repo = seafile_api.get_repo(repo_id)
-            if repo.encrypted:
-                # Don't include encrypted repos
-                return
-            repo.name = repo.name.encode('utf-8')
-            if repo:
+            repo = repo or seafile_api.get_repo(repo_id)
+            if repo and not repo.encrypted:
+                repo.name = repo.name.encode('utf-8')
                 all_repos[repo_id] = repo
         except SearpcError, e:
             util.warn("Failed to get repo %.8s: %s" % (repo_id, e.msg))
@@ -686,9 +688,7 @@ def getAccessibleRepos(username, org_id):
     except SearpcError, e:
         util.warn("Failed to get groups for %s" % username)
     for repo in repos:
-        if all_repos.has_key(repo.id):
-            continue
-        all_repos[repo.id] = repo
+        addRepo(repo)
 
     return all_repos.values()
 
