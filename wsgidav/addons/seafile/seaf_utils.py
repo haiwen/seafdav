@@ -2,6 +2,10 @@
 # -*- coding: utf-8 -*-
 
 import os
+import ConfigParser
+import wsgidav.util as util
+
+_logger = util.getModuleLogger(__name__)
 
 def get_seafile_conf_dir():
     try:
@@ -47,3 +51,17 @@ class UTF8Dict(dict):
 def utf8_path_join(*args):
     args = [ utf8_wrap(arg) for arg in args ]
     return os.path.join(*args)
+
+_multi_tenancy_enabled = None
+def multi_tenancy_enabled():
+    global _multi_tenancy_enabled
+    if _multi_tenancy_enabled is None:
+        _multi_tenancy_enabled = False
+        try:
+            cp = ConfigParser.ConfigParser()
+            cp.read(os.path.join(os.environ['SEAFILE_CONF_DIR'], 'seafile.conf'))
+            if cp.has_option('general', 'multi_tenancy'):
+                _multi_tenancy_enabled = cp.getboolean('general', 'multi_tenancy')
+        except:
+            _logger.exception('failed to read multi_tenancy')
+    return _multi_tenancy_enabled

@@ -1,7 +1,10 @@
 import os
 import ccnet
 from pysearpc import SearpcError
-from seaf_utils import CCNET_CONF_DIR
+from seaf_utils import CCNET_CONF_DIR, multi_tenancy_enabled
+import wsgidav.util as util
+
+_logger = util.getModuleLogger(__name__)
 
 class SeafileDomainController(object):
 
@@ -34,11 +37,18 @@ class SeafileDomainController(object):
             return False
 
         try:
-            ret = self.ccnet_threaded_rpc.validate_emailuser(username, password)
+            if self.ccnet_threaded_rpc.validate_emailuser(username, password) != 0:
+                return False
         except:
             return False
 
-        if ret == 0:
-            return True
-        else:
-            return False
+        if multi_tenancy_enabled():
+            try:
+                orgs = self.ccnet_threaded_rpc.get_orgs_by_user(username)
+                if orgs:
+                    environ['seafile.org_id'] = orgs[0].org_id
+            except Exception, e:
+                _logger.exception('get_orgs_by_user')
+                pass
+
+        return True
