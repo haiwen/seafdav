@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import posixpath
 import ConfigParser
 import wsgidav.util as util
 
@@ -50,7 +51,7 @@ class UTF8Dict(dict):
 
 def utf8_path_join(*args):
     args = [ utf8_wrap(arg) for arg in args ]
-    return os.path.join(*args)
+    return posixpath.join(*args)
 
 _multi_tenancy_enabled = None
 def multi_tenancy_enabled():
