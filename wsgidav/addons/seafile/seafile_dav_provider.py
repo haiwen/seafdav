@@ -691,9 +691,7 @@ def getAccessibleRepos(username, org_id):
         addRepo(repo)
 
     for repo in list_inner_pub_repos(username, org_id):
-        repo.name = repo.repo_name
-        repo.id = repo.repo_id
-        addRepo(repo)
+        addRepo(repo.repo_id)
 
     return all_repos.values()
 
