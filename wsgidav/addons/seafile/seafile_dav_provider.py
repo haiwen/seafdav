@@ -690,6 +690,11 @@ def getAccessibleRepos(username, org_id):
     for repo in repos:
         addRepo(repo)
 
+    for repo in list_inner_pub_repos(username, org_id):
+        repo.name = repo.repo_name
+        repo.id = repo.repo_id
+        addRepo(repo)
+
     return all_repos.values()
 
 def get_owned_repos(username, org_id):
@@ -785,3 +790,10 @@ def get_repo_last_modify(repo):
     if repo.head_cmmt_id is not None:
         last_cmmt = seaserv.get_commit(repo.id, repo.version, repo.head_cmmt_id)
     return last_cmmt.ctime if last_cmmt else 0
+
+
+def list_inner_pub_repos(username, org_id):
+    if org_id:
+        return seaserv.list_org_inner_pub_repos(org_id, username)
+
+    return seaserv.list_inner_pub_repos(username)
