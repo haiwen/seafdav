@@ -639,7 +639,7 @@ def getRepoByName(repo_name, username, org_id):
 
     if not ret_repo:
         for repo in repos:
-            if repo.name + "-" + repo.id[:6] == repo_name:
+            if repo.name + "-" + repo.id[:6].encode('utf-8') == repo_name:
                 ret_repo = repo
                 break
         if not ret_repo:
