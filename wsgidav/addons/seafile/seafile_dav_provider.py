@@ -650,16 +650,11 @@ def getRepoByName(repo_name, username, org_id):
 def getAccessibleRepos(username, org_id):
     all_repos = {}
 
-    def addRepo(repo):
-        if isinstance(repo, basestring):
-            repo_id = repo
-            repo = None
-        else:
-            repo_id = repo.id
+    def addRepo(repo_id):
         try:
             if all_repos.has_key(repo_id):
                 return
-            repo = repo or seafile_api.get_repo(repo_id)
+            repo = seafile_api.get_repo(repo_id)
             if repo and not repo.encrypted:
                 repo.name = repo.name.encode('utf-8')
                 all_repos[repo_id] = repo
@@ -684,11 +679,11 @@ def getAccessibleRepos(username, org_id):
 
     try:
         groups = get_groups_by_user(username, org_id)
-        repos = get_group_repos(username, org_id, groups)
+        repo_ids = get_group_repos(username, org_id, groups)
     except SearpcError, e:
         util.warn("Failed to get groups for %s" % username)
-    for repo in repos:
-        addRepo(repo)
+    for repo_id in repo_ids:
+        addRepo(repo_id)
 
     for repo in list_inner_pub_repos(username, org_id):
         addRepo(repo.repo_id)
@@ -736,21 +731,7 @@ def get_group_repos(username, org_id, groups):
                 repo_owner = seafile_api.get_org_repo_owner(r_id)
                 if repo_owner == username:
                     continue
-                # Convert repo properties due to the different collumns in Repo
-                # and SharedRepo
-                r = seafile_api.get_repo(r_id)
-                if not r:
-                    continue
-                r.repo_id = r.id
-                r.repo_name = r.name
-                r.repo_desc = r.desc
-                r.last_modified = get_repo_last_modify(r)
-                r.share_type = 'group'
-                r.user = repo_owner
-                r.user_perm = seafile_api.check_repo_access_permission(
-                    r_id, username)
-                r.group = grp
-                group_repos.append(r)
+                group_repos.append(r_id)
     else:
         # For each group I joined...
         for grp in groups:
@@ -760,21 +741,7 @@ def get_group_repos(username, org_id, groups):
                 repo_owner = seafile_api.get_repo_owner(r_id)
                 if repo_owner == username:
                     continue
-                # Convert repo properties due to the different collumns in Repo
-                # and SharedRepo
-                r = seafile_api.get_repo(r_id)
-                if not r:
-                    continue
-                r.repo_id = r.id
-                r.repo_name = r.name
-                r.repo_desc = r.desc
-                r.last_modified = get_repo_last_modify(r)
-                r.share_type = 'group'
-                r.user = repo_owner
-                r.user_perm = seafile_api.check_repo_access_permission(
-                    r_id, username)
-                r.group = grp
-                group_repos.append(r)
+                group_repos.append(r_id)
     return group_repos
 
 def get_repo_last_modify(repo):
