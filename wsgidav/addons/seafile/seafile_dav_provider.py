@@ -131,7 +131,7 @@ class SeafileResource(DAVNonCollection):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
 
-        if seafile_api.check_permission(self.repo.id, self.username) != "rw":
+        if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
 
         if not self.check_repo_owner_quota(isnewfile, contentlength):
@@ -159,7 +159,7 @@ class SeafileResource(DAVNonCollection):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
 
-        if seafile_api.check_permission(self.repo.id, self.username) != "rw":
+        if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
 
         parent, filename = os.path.split(self.rel_path)
@@ -180,7 +180,7 @@ class SeafileResource(DAVNonCollection):
         dest_dir, dest_file = os.path.split(rel_path)
         dest_repo = getRepoByName(repo_name, self.username, self.org_id, self.is_guest)
 
-        if seafile_api.check_permission(dest_repo.id, self.username) != "rw":
+        if seafile_api.check_permission_by_path(dest_repo.id, self.rel_path, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
 
         src_dir, src_file = os.path.split(self.rel_path)
@@ -213,7 +213,7 @@ class SeafileResource(DAVNonCollection):
         dest_dir, dest_file = os.path.split(rel_path)
         dest_repo = getRepoByName(repo_name, self.username, self.org_id, self.is_guest)
 
-        if seafile_api.check_permission(dest_repo.id, self.username) != "rw":
+        if seafile_api.check_permission_by_path(dest_repo.id, self.rel_path, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
 
         src_dir, src_file = os.path.split(self.rel_path)
@@ -322,7 +322,7 @@ class SeafDirResource(DAVCollection):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
 
-        if seafile_api.check_permission(self.repo.id, self.username) != "rw":
+        if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
 
         if check_repo_quota(self.repo.id) < 0:
@@ -357,7 +357,7 @@ class SeafDirResource(DAVCollection):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
 
-        if seafile_api.check_permission(self.repo.id, self.username) != "rw":
+        if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
 
         if not seafile_api.is_valid_filename(self.repo.id, name):
@@ -369,7 +369,7 @@ class SeafDirResource(DAVCollection):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
 
-        if seafile_api.check_permission(self.repo.id, self.username) != "rw":
+        if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
 
         parent, filename = os.path.split(self.rel_path)
@@ -394,7 +394,7 @@ class SeafDirResource(DAVCollection):
         dest_dir, dest_file = os.path.split(rel_path)
         dest_repo = getRepoByName(repo_name, self.username, self.org_id, self.is_guest)
 
-        if seafile_api.check_permission(dest_repo.id, self.username) != "rw":
+        if seafile_api.check_permission_by_path(dest_repo.id, self.rel_path, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
 
         src_dir, src_file = os.path.split(self.rel_path)
@@ -422,7 +422,7 @@ class SeafDirResource(DAVCollection):
         dest_dir, dest_file = os.path.split(rel_path)
         dest_repo = getRepoByName(repo_name, self.username, self.org_id, self.is_guest)
 
-        if seafile_api.check_permission(dest_repo.id, self.username) != "rw":
+        if seafile_api.check_permission_by_path(dest_repo.id, self.rel_path, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
 
         src_dir, src_file = os.path.split(self.rel_path)
