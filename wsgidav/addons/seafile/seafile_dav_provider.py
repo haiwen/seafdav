@@ -441,7 +441,7 @@ class RootResource(DAVCollection):
     def __init__(self, username, environ):
         super(RootResource, self).__init__("/", environ)
         self.username = username
-        self.org_id = environ.get('seafile.org_id')
+        self.org_id = environ.get('seafile.org_id', '')
         self.is_guest = environ.get('seafile.is_guest', False)
 
     # Getter methods for standard live properties
@@ -564,7 +564,7 @@ class SeafileProvider(DAVProvider):
         self._count_getResourceInst += 1
 
         username = environ.get("http_authenticator.username", "")
-        org_id = environ.get("seafile.org_id")
+        org_id = environ.get("seafile.org_id", "")
         is_guest = environ.get("seafile.is_guest", False)
 
         if path == "/" or path == "":
