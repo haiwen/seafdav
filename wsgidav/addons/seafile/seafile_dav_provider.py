@@ -38,6 +38,7 @@ class SeafileResource(DAVNonCollection):
         self.obj = obj
         self.username = environ.get("http_authenticator.username", "")
         self.org_id = environ.get("seafile.org_id", "")
+        self.is_guest = environ.get("seafile.is_guest", False)
         self.tmpfile_path = None
         self.owner = None
 
@@ -177,7 +178,7 @@ class SeafileResource(DAVNonCollection):
         rel_path = parts[1]
 
         dest_dir, dest_file = os.path.split(rel_path)
-        dest_repo = getRepoByName(repo_name, self.username, self.org_id)
+        dest_repo = getRepoByName(repo_name, self.username, self.org_id, self.is_guest)
 
         if seafile_api.check_permission(dest_repo.id, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
@@ -210,7 +211,7 @@ class SeafileResource(DAVNonCollection):
         rel_path = parts[1]
 
         dest_dir, dest_file = os.path.split(rel_path)
-        dest_repo = getRepoByName(repo_name, self.username, self.org_id)
+        dest_repo = getRepoByName(repo_name, self.username, self.org_id, self.is_guest)
 
         if seafile_api.check_permission(dest_repo.id, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
@@ -238,6 +239,7 @@ class SeafDirResource(DAVCollection):
         self.obj = obj
         self.username = environ.get("http_authenticator.username", "")
         self.org_id = environ.get("seafile.org_id", "")
+        self.is_guest = environ.get("seafile.is_guest", False)
 
     # Getter methods for standard live properties
     def getCreationDate(self):
@@ -390,7 +392,7 @@ class SeafDirResource(DAVCollection):
         rel_path = parts[1]
 
         dest_dir, dest_file = os.path.split(rel_path)
-        dest_repo = getRepoByName(repo_name, self.username, self.org_id)
+        dest_repo = getRepoByName(repo_name, self.username, self.org_id, self.is_guest)
 
         if seafile_api.check_permission(dest_repo.id, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
@@ -418,7 +420,7 @@ class SeafDirResource(DAVCollection):
         rel_path = parts[1]
 
         dest_dir, dest_file = os.path.split(rel_path)
-        dest_repo = getRepoByName(repo_name, self.username, self.org_id)
+        dest_repo = getRepoByName(repo_name, self.username, self.org_id, self.is_guest)
 
         if seafile_api.check_permission(dest_repo.id, self.username) != "rw":
             raise DAVError(HTTP_FORBIDDEN)
@@ -440,6 +442,7 @@ class RootResource(DAVCollection):
         super(RootResource, self).__init__("/", environ)
         self.username = username
         self.org_id = environ.get('seafile.org_id')
+        self.is_guest = environ.get('seafile.is_guest', False)
 
     # Getter methods for standard live properties
     def getCreationDate(self):
@@ -456,7 +459,7 @@ class RootResource(DAVCollection):
         return None
 
     def getMemberNames(self):
-        all_repos = getAccessibleRepos(self.username, self.org_id)
+        all_repos = getAccessibleRepos(self.username, self.org_id, self.is_guest)
 
         name_hash = {}
         for r in all_repos:
@@ -479,7 +482,7 @@ class RootResource(DAVCollection):
         return namelist
 
     def getMember(self, name):
-        repo = getRepoByName(name, self.username, self.org_id)
+        repo = getRepoByName(name, self.username, self.org_id, self.is_guest)
         return self._createRootRes(repo, name)
 
     def getMemberList(self):
@@ -488,7 +491,7 @@ class RootResource(DAVCollection):
         The default implementation call getMemberNames() then call getMember()
         for each name. This calls getAccessibleRepos() for too many times.
         """
-        all_repos = getAccessibleRepos(self.username, self.org_id)
+        all_repos = getAccessibleRepos(self.username, self.org_id, self.is_guest)
 
         name_hash = {}
         for r in all_repos:
@@ -562,13 +565,14 @@ class SeafileProvider(DAVProvider):
 
         username = environ.get("http_authenticator.username", "")
         org_id = environ.get("seafile.org_id")
+        is_guest = environ.get("seafile.is_guest", False)
 
         if path == "/" or path == "":
             return RootResource(username, environ)
 
         path = path.rstrip("/")
         try:
-            repo, rel_path, obj = resolvePath(path, username, org_id)
+            repo, rel_path, obj = resolvePath(path, username, org_id, is_guest)
         except DAVError, e:
             if e.value == HTTP_NOT_FOUND:
                 return None
@@ -578,13 +582,13 @@ class SeafileProvider(DAVProvider):
             return SeafDirResource(path, repo, rel_path, obj, environ)
         return SeafileResource(path, repo, rel_path, obj, environ)
 
-def resolvePath(path, username, org_id):
+def resolvePath(path, username, org_id, is_guest):
     segments = path.strip("/").split("/")
     if len(segments) == 0:
         raise DAVError(HTTP_BAD_REQUEST)
     repo_name = segments.pop(0)
 
-    repo = getRepoByName(repo_name, username, org_id)
+    repo = getRepoByName(repo_name, username, org_id, is_guest)
 
     rel_path = ""
     obj = get_repo_root_seafdir(repo)
@@ -628,8 +632,8 @@ def get_repo_root_seafdir(repo):
     root_id = commit_mgr.get_commit_root_id(repo.id, repo.version, repo.head_cmmt_id)
     return fs_mgr.load_seafdir(repo.store_id, repo.version, root_id)
 
-def getRepoByName(repo_name, username, org_id):
-    repos = getAccessibleRepos(username, org_id)
+def getRepoByName(repo_name, username, org_id, is_guest):
+    repos = getAccessibleRepos(username, org_id, is_guest)
 
     ret_repo = None
     for repo in repos:
@@ -647,7 +651,7 @@ def getRepoByName(repo_name, username, org_id):
 
     return ret_repo
 
-def getAccessibleRepos(username, org_id):
+def getAccessibleRepos(username, org_id, is_guest):
     all_repos = {}
 
     def addRepo(repo_id):
@@ -685,7 +689,7 @@ def getAccessibleRepos(username, org_id):
     for repo_id in repo_ids:
         addRepo(repo_id)
 
-    for repo in list_inner_pub_repos(username, org_id):
+    for repo in list_inner_pub_repos(username, org_id, is_guest):
         addRepo(repo.repo_id)
 
     return all_repos.values()
@@ -757,7 +761,10 @@ def get_repo_last_modify(repo):
     return last_cmmt.ctime if last_cmmt else 0
 
 
-def list_inner_pub_repos(username, org_id):
+def list_inner_pub_repos(username, org_id, is_guest):
+    if is_guest:
+        return []
+
     if org_id:
         return seaserv.list_org_inner_pub_repos(org_id, username)
 
