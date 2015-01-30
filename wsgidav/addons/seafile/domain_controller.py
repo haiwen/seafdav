@@ -42,6 +42,15 @@ class SeafileDomainController(object):
         except:
             return False
 
+        try:
+            user = self.ccnet_threaded_rpc.get_emailuser(username)
+            if user.role == 'guest':
+                environ['seafile.is_guest'] = True
+            else:
+                environ['seafile.is_guest'] = False
+        except Exception as e:
+            _logger.exception('get_emailuser')
+
         if multi_tenancy_enabled():
             try:
                 orgs = self.ccnet_threaded_rpc.get_orgs_by_user(username)
