@@ -421,7 +421,7 @@ def byteNumberString(number, thousandsSep=True, partition=False, base1024=True, 
             bytesuffix = " Bytes"
 
     if thousandsSep and (number >= 1000 or magsuffix):
-        locale.setlocale(locale.LC_ALL, "")
+        # locale.setlocale(locale.LC_ALL, "")
         # TODO: make precision configurable
         snum = locale.format("%d", number, thousandsSep)
     else:
