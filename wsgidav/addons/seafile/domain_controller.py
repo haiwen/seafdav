@@ -1,7 +1,7 @@
 import os
 import ccnet
 from pysearpc import SearpcError
-from seaf_utils import CCNET_CONF_DIR, multi_tenancy_enabled
+from seaf_utils import CCNET_CONF_DIR, SEAFILE_CENTRAL_CONF_DIR, multi_tenancy_enabled
 import wsgidav.util as util
 
 _logger = util.getModuleLogger(__name__)
@@ -9,9 +9,7 @@ _logger = util.getModuleLogger(__name__)
 class SeafileDomainController(object):
 
     def __init__(self):
-        ccnet_conf_dir = os.path.normpath(os.path.expanduser(CCNET_CONF_DIR))
-
-        pool = ccnet.ClientPool(ccnet_conf_dir)
+        pool = ccnet.ClientPool(CCNET_CONF_DIR, central_config_dir=SEAFILE_CENTRAL_CONF_DIR)
         self.ccnet_threaded_rpc = ccnet.CcnetThreadedRpcClient(pool, req_pool=True)
 
     def __repr__(self):
