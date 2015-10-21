@@ -670,7 +670,7 @@ class RequestServer(object):
                                      isnewfile=isnewfile,
                                      contentlength=contentlength)
 
-            if environ.get("HTTP_TRANSFER_ENCODING", "").lower() == "chunked":
+            if environ.get("HTTP_TRANSFER_ENCODING", "").lower() == "chunked" and not contentlength:
                 buf = environ["wsgi.input"].readline()
                 if buf == '':
                     l = 0
