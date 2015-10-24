@@ -43,7 +43,7 @@ class SeafileDomainController(object):
             return False
 
         try:
-            user = self.ccnet_threaded_rpc.get_emailuser(username)
+            user = self.ccnet_threaded_rpc.get_emailuser_with_import(username)
             if user.role == 'guest':
                 environ['seafile.is_guest'] = True
             else:
