@@ -11,9 +11,12 @@ _logger = util.getModuleLogger(__name__)
 
 def _load_path_from_env(key, check=True):
     v = os.environ.get(key, '')
-    if not v and check:
-        raise ImportError(
-            "Seaserv cannot be imported, because environment variable %s is undefined." % key)
+    if not v:
+        if check:
+            raise ImportError(
+                "seaf_util cannot be imported, because environment variable %s is undefined." % key)
+        else:
+            return None
     return os.path.normpath(os.path.expanduser(v))
 
 CCNET_CONF_DIR = _load_path_from_env('CCNET_CONF_DIR')
@@ -59,7 +62,7 @@ def multi_tenancy_enabled():
         try:
             cp = ConfigParser.ConfigParser()
             cp.read(
-                SEAFILE_CENTRAL_CONF_DIR if SEAFILE_CENTRAL_CONF_DIR else SEAFILE_CONF_DIR, 'seafile.conf')
+                os.path.join(SEAFILE_CENTRAL_CONF_DIR if SEAFILE_CENTRAL_CONF_DIR else SEAFILE_CONF_DIR, 'seafile.conf'))
             if cp.has_option('general', 'multi_tenancy'):
                 _multi_tenancy_enabled = cp.getboolean(
                     'general', 'multi_tenancy')
