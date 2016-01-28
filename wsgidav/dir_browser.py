@@ -107,6 +107,12 @@ function openWithSharePointPlugin(url) {
 }
 """
 
+def escapeName(name):
+    """
+    Returns the given text with ampersands, quotes and angle brackets encoded
+    for use in HTML.
+    """
+    return name.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#39;')
 
 class WsgiDavDirBrowser(BaseMiddleware):
     """WSGI middleware that handles GET requests on collections to display directories."""
@@ -179,7 +185,6 @@ class WsgiDavDirBrowser(BaseMiddleware):
         if self._verbose >= 2:
             print >>sys.stdout, "Raising DAVError %s" % e.getUserInfo()
         raise e
-
     
     def _listDirectory(self, davres, environ, start_response):
         """
@@ -197,7 +202,7 @@ class WsgiDavDirBrowser(BaseMiddleware):
                 "<a href='https://github.com/mar10/wsgidav/'>WsgiDAV/%s</a>" % __version__)
             trailer = trailer.replace("${time}", util.getRfc1123Time())
         else:
-            trailer = ("<a href='https://github.com/mar10/wsgidav/'>WsgiDAV/%s</a> - %s" 
+            trailer = ("Seafile WebDAV Server, based on <a href='https://github.com/mar10/wsgidav/'>WsgiDAV/%s</a> - %s" 
                        % (__version__, util.getRfc1123Time()))
 
         
@@ -261,7 +266,7 @@ class WsgiDavDirBrowser(BaseMiddleware):
                 href = res.getHref()
                 infoDict = {"href": href,
                             "class": "",
-                            "displayName": res.getDisplayName(),
+                            "displayName": escapeName(res.getDisplayName()),
                             "lastModified": res.getLastModified(),
                             "isCollection": res.isCollection,
                             "contentLength": res.getContentLength(),
