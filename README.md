@@ -4,6 +4,29 @@ This is the WebDAV server for seafile.
 
 See [Seafile Server Manual](http://manual.seafile.com/extension/webdav.html) for details.
 
+# Running
+
+There are two templates for running seafdav:
+- run.sh.template: This is for running seafdav on the default 8080 port with a built-in CherryPy server.
+- run-fcgi.sh.template and seafdav.conf.template:
+  These two files are for running seafdav on fastcgi mode.
+
+To run on 8080 port:
+
+```
+cp run.sh.template run.sh
+```
+
+Then change CCNET_CONF_DIR and SEAFILE_CONF_DIR to your Seafile server's settings.
+
+To run fastcgi mode:
+
+```
+cp run-fcgi.sh.template run-fcgi.sh
+cp seafdav.conf.template seafdav.conf
+```
+
+Then change CCNET_CONF_DIR and SEAFILE_CONF_DIR to your Seafile server's settings.
 
 # Testing
 
