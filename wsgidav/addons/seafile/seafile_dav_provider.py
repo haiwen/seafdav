@@ -671,7 +671,8 @@ def getAccessibleRepos(username, org_id, is_guest):
         util.warn("Failed to list owned repos: %s" % e.msg)
 
     for orepo in owned_repos:
-        addRepo(orepo.id)
+        if not orepo.is_virtual:
+            addRepo(orepo.id)
 
     try:
         shared_repos = get_share_in_repo_list(username, org_id)
