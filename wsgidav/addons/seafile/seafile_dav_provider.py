@@ -196,7 +196,7 @@ class SeafileResource(DAVNonCollection):
             seafile_api.del_file(dest_repo.id, dest_dir, dest_file, self.username)
 
         seafile_api.move_file(self.repo.id, src_dir, src_file,
-                              dest_repo.id, dest_dir, dest_file, self.username, NEED_PROGRESS, SYNCHRONOUS)
+                              dest_repo.id, dest_dir, dest_file, 1, self.username, NEED_PROGRESS, SYNCHRONOUS)
 
         return True
 
@@ -405,7 +405,7 @@ class SeafDirResource(DAVCollection):
             raise DAVError(HTTP_BAD_REQUEST)
 
         seafile_api.move_file(self.repo.id, src_dir, src_file,
-                              dest_repo.id, dest_dir, dest_file, self.username, NEED_PROGRESS, SYNCHRONOUS)
+                              dest_repo.id, dest_dir, dest_file, 0, self.username, NEED_PROGRESS, SYNCHRONOUS)
 
         return True
 
