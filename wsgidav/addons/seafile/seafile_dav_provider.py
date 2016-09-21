@@ -99,28 +99,16 @@ class SeafileResource(DAVNonCollection):
 
         Return True if the quota would not be exceeded, otherwise return False.
         """
-        # if contentlength <= 0:
-        #     # When client use "transfer-encode: chunking", the content length
-        #     # is not included in the request headers
-        #     if isnewfile:
-        #         return check_repo_quota(self.repo.id) >= 0
-        #     else:
-        #         return True
-
-        # if not self.owner:
-        #     self.owner = seafile_api.get_repo_owner(self.repo.id)
-        # quota = seafile_api.get_user_quota(self.owner)
-        # if quota == INFINITE_QUOTA:
-        #     return True
-        # self_usage = seafile_api.get_user_self_usage(self.owner)
-        # share_usage = seafile_api.get_user_share_usage(self.owner) if CALC_SHARE_USAGE else 0
-
-        # remain = quota - self_usage - share_usage
-        # if not isnewfile:
-        #     remain -= self.obj.size
-
-        # return contentlength <= remain
-        return check_repo_quota(self.repo.id) >= 0
+        if contentlength <= 0:
+            # When client use "transfer-encode: chunking", the content length
+            # is not included in the request headers
+            if isnewfile:
+                return check_repo_quota(self.repo.id) >= 0
+            else:
+                return True
+        else:
+            delta = contentlength - self.obj.size
+            return check_repo_quota(self.repo.id, delta) >= 0
 
     def beginWrite(self, contentType=None, isnewfile=True, contentlength=-1):
         """Open content as a stream for writing.
