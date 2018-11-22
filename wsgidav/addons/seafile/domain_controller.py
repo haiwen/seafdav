@@ -6,8 +6,21 @@ import wsgidav.util as util
 
 import seahub_db
 from seahub_db import Base
+import seahub_settings
 
 _logger = util.getModuleLogger(__name__)
+
+# the block size for the cipher object; must be 16, 24, or 32 for AES
+BLOCK_SIZE = 32
+
+from Crypto.Cipher import AES
+import base64
+PADDING = '{'
+
+# An encrypted block size must be a multiple of 16
+pad = lambda s: s + (16 - len(s) % 16) * PADDING
+# encrypt with AES, encode with base64
+EncodeAES = lambda c, s: base64.b64encode(c.encrypt(pad(s)))
 
 class SeafileDomainController(object):
 
@@ -43,16 +56,33 @@ class SeafileDomainController(object):
                 if not self.session_cls:
                     return False
                 # Assume that @username is a contact_email, get real email from seahub_db
+                email = None
                 session = self.session_cls()
                 profile_profile = Base.classes.profile_profile
                 q = session.query(profile_profile.user).filter(profile_profile.contact_email==username)
-                email = q.first()[0]
-                session.close()
-                if not email:
-                    return False
-                if self.ccnet_threaded_rpc.validate_emailuser(email, password) != 0:
-                    return False
+                res = q.first()
+                if res:
+                    email = res[0]
+                    if self.ccnet_threaded_rpc.validate_emailuser(email, password) != 0:
+                        email = None
 
+                # Assume that user is logging in with shibboleth, validate dedicated password from seahub_db
+                if not email:
+                    secret = seahub_settings.SECRET_KEY[:BLOCK_SIZE]
+                    cipher = AES.new(secret)
+                    encoded_str = 'aes$' + EncodeAES(cipher, password)
+                    options_useroptions = Base.classes.options_useroptions
+                    q = session.query(options_useroptions.email)
+                    q = q.filter(options_useroptions.email==username,
+                                 options_useroptions.option_val==encoded_str)
+                    res = q.first()
+                    if res:
+                        email = res[0]
+                    else:
+                        session.close()
+                        return False
+
+                session.close()
                 username = email
         except Exception as e:
             print e
