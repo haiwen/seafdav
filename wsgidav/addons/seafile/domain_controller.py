@@ -69,7 +69,7 @@ class SeafileDomainController(object):
                 # Assume that user is logging in with shibboleth, validate dedicated password from seahub_db
                 if not email:
                     secret = seahub_settings.SECRET_KEY[:BLOCK_SIZE]
-                    cipher = AES.new(secret)
+                    cipher = AES.new(secret, AES.MODE_ECB)
                     encoded_str = 'aes$' + EncodeAES(cipher, password)
                     options_useroptions = Base.classes.options_useroptions
                     q = session.query(options_useroptions.email)
