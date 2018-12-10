@@ -83,7 +83,8 @@ class SeafileDomainController(object):
                         return False
 
                 session.close()
-                username = email
+                if email:
+                    username = email
         except Exception as e:
             print e
             return False
@@ -105,5 +106,7 @@ class SeafileDomainController(object):
             except Exception, e:
                 _logger.exception('get_orgs_by_user')
                 pass
+
+        environ["http_authenticator.username"] = username.encode('utf8')
 
         return True

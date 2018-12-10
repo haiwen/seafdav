@@ -234,7 +234,7 @@ class HTTPAuthenticator(BaseMiddleware):
         
         if self._domaincontroller.authDomainUser(realmname, username, password, environ):
             environ["http_authenticator.realm"] = realmname
-            environ["http_authenticator.username"] = username
+            #environ["http_authenticator.username"] = username
             return self._application(environ, start_response)
         return self.sendBasicAuthResponse(environ, start_response)
         
