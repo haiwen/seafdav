@@ -13,7 +13,6 @@ _logger = util.getModuleLogger(__name__)
 # the block size for the cipher object; must be 16, 24, or 32 for AES
 BLOCK_SIZE = 32
 
-from Crypto.Cipher import AES
 import base64
 PADDING = '{'
 
@@ -68,6 +67,11 @@ class SeafileDomainController(object):
 
                 # Assume that user is logging in with shibboleth, validate dedicated password from seahub_db
                 if not email:
+                    try:
+                        from Crypto.Cipher import AES
+                    except:
+                        session.close()
+                        return False
                     secret = seahub_settings.SECRET_KEY[:BLOCK_SIZE]
                     cipher = AES.new(secret, AES.MODE_ECB)
                     encoded_str = 'aes$' + EncodeAES(cipher, password)
