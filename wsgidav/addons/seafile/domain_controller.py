@@ -51,46 +51,42 @@ class SeafileDomainController(object):
             return False
 
         try:
-            if self.ccnet_threaded_rpc.validate_emailuser(username, password) != 0:
-                if not self.session_cls:
-                    return False
-                # Assume that @username is a contact_email, get real email from seahub_db
-                email = None
-                session = self.session_cls()
+            ccnet_email = None
+            session = self.session_cls()
+
+            user = self.ccnet_threaded_rpc.get_emailuser(username)
+            if user:
+                ccnet_email = user.email
+            else:
                 profile_profile = Base.classes.profile_profile
                 q = session.query(profile_profile.user).filter(profile_profile.contact_email==username)
                 res = q.first()
                 if res:
-                    email = res[0]
-                    if self.ccnet_threaded_rpc.validate_emailuser(email, password) != 0:
-                        email = None
+                    ccnet_email = res[0]
 
-                # Assume that user is logging in with shibboleth, validate dedicated password from seahub_db
-                if not email:
-                    try:
-                        from Crypto.Cipher import AES
-                    except:
-                        session.close()
-                        return False
-                    secret = seahub_settings.SECRET_KEY[:BLOCK_SIZE]
-                    cipher = AES.new(secret, AES.MODE_ECB)
-                    encoded_str = 'aes$' + EncodeAES(cipher, password)
-                    options_useroptions = Base.classes.options_useroptions
-                    q = session.query(options_useroptions.email)
-                    q = q.filter(options_useroptions.email==username,
-                                 options_useroptions.option_val==encoded_str)
-                    res = q.first()
-                    if res:
-                        email = res[0]
-                    else:
-                        session.close()
-                        return False
-
+            if not ccnet_email:
+                _logger.warning('User %s doesn\'t exist', username)
                 session.close()
-                if email:
-                    username = email
+                return False
+
+            if self.ccnet_threaded_rpc.validate_emailuser(ccnet_email, password) != 0:
+                from Crypto.Cipher import AES
+                secret = seahub_settings.SECRET_KEY[:BLOCK_SIZE]
+                cipher = AES.new(secret, AES.MODE_ECB)
+                encoded_str = 'aes$' + EncodeAES(cipher, password)
+                options_useroptions = Base.classes.options_useroptions
+                q = session.query(options_useroptions.email)
+                q = q.filter(options_useroptions.email==ccnet_email,
+                             options_useroptions.option_val==encoded_str)
+                res = q.first()
+                if not res:
+                    session.close()
+                    return False
+
+            session.close()
+            username = ccnet_email
         except Exception as e:
-            print e
+            _logger.warning('Failed to login: %s', e)
             return False
 
         try:
