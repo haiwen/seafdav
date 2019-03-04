@@ -52,38 +52,46 @@ class SeafileDomainController(object):
 
         try:
             ccnet_email = None
-            session = self.session_cls()
+            session = None
+            if self.session_cls:
+                session = self.session_cls()
 
             user = self.ccnet_threaded_rpc.get_emailuser(username)
             if user:
                 ccnet_email = user.email
             else:
-                profile_profile = Base.classes.profile_profile
-                q = session.query(profile_profile.user).filter(profile_profile.contact_email==username)
-                res = q.first()
-                if res:
-                    ccnet_email = res[0]
+                if session:
+                    profile_profile = Base.classes.profile_profile
+                    q = session.query(profile_profile.user).filter(profile_profile.contact_email==username)
+                    res = q.first()
+                    if res:
+                        ccnet_email = res[0]
 
             if not ccnet_email:
                 _logger.warning('User %s doesn\'t exist', username)
-                session.close()
+                if session:
+                    session.close()
                 return False
 
             if self.ccnet_threaded_rpc.validate_emailuser(ccnet_email, password) != 0:
-                from Crypto.Cipher import AES
-                secret = seahub_settings.SECRET_KEY[:BLOCK_SIZE]
-                cipher = AES.new(secret, AES.MODE_ECB)
-                encoded_str = 'aes$' + EncodeAES(cipher, password)
-                options_useroptions = Base.classes.options_useroptions
-                q = session.query(options_useroptions.email)
-                q = q.filter(options_useroptions.email==ccnet_email,
-                             options_useroptions.option_val==encoded_str)
-                res = q.first()
-                if not res:
-                    session.close()
+                if not session:
                     return False
+                else:
+                    from Crypto.Cipher import AES
+                    secret = seahub_settings.SECRET_KEY[:BLOCK_SIZE]
+                    cipher = AES.new(secret, AES.MODE_ECB)
+                    encoded_str = 'aes$' + EncodeAES(cipher, password)
+                    options_useroptions = Base.classes.options_useroptions
+                    q = session.query(options_useroptions.email)
+                    q = q.filter(options_useroptions.email==ccnet_email,
+                                 options_useroptions.option_val==encoded_str)
+                    res = q.first()
+                    if not res:
+                        session.close()
+                        return False
 
-            session.close()
+            if session:
+                session.close()
             username = ccnet_email
         except Exception as e:
             _logger.warning('Failed to login: %s', e)

@@ -138,11 +138,11 @@ class WsgiDAVApp(object):
     def __init__(self, config):
         self.config = config
 
-        util.initLogging(config["verbose"],
-                         config.get("log_path", ""),
-                         config.get("enable_loggers", []))
-        
-        util.log("Default encoding: %s (file system: %s)" % (sys.getdefaultencoding(), sys.getfilesystemencoding()))
+        #util.initLogging(config["verbose"],
+        #                 config.get("log_path", ""),
+        #                 config.get("enable_loggers", []))
+        # 
+        #util.log("Default encoding: %s (file system: %s)" % (sys.getdefaultencoding(), sys.getfilesystemencoding()))
         
         # Evaluate configuration and set defaults
         _checkConfig(config)
