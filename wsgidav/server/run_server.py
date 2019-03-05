@@ -170,8 +170,8 @@ def _initConfig():
     else:
         temp_verbose = cmdLineOpts["verbose"]
 
-    _loadSeafileSettings(config)
-    
+    #_loadSeafileSettings(config)
+
     # Command line options
     if cmdLineOpts.get("port"):
         config["port"] = cmdLineOpts.get("port")
@@ -184,6 +184,14 @@ def _initConfig():
     if log_path:
         log_path = os.path.abspath(log_path)
         config["log_path"] = log_path
+
+    util.initLogging(config["verbose"],
+                     config.get("log_path", ""),
+                     config.get("enable_loggers", []))
+
+    util.log("Default encoding: %s (file system: %s)" % (sys.getdefaultencoding(), sys.getfilesystemencoding()))
+
+    _loadSeafileSettings(config)
 
     pid_file = cmdLineOpts.get("pid_file", "")
     if pid_file:

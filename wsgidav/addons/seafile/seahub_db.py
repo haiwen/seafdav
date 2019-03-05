@@ -1,4 +1,3 @@
-import logging
 from urllib import quote_plus
 
 from sqlalchemy import create_engine
@@ -10,14 +9,18 @@ from sqlalchemy.ext.automap import automap_base
 
 Base = automap_base()
 
+import wsgidav.util as util
+_logger = util.getModuleLogger(__name__)
+
 def init_db_session_class():
     try:
+        _logger.info('Init seahub database...')
         engine = create_seahub_db_engine()
         Base.prepare(engine, reflect=True)
         Session = sessionmaker(bind=engine)
         return Session
     except Exception as e:
-        logging.warning('Failed to init seahub db: %s.', e)
+        _logger.warning('Failed to init seahub db: %s.', e)
         return None
 
 def create_seahub_db_engine():
@@ -27,18 +30,18 @@ def create_seahub_db_engine():
     #db_infos = local_settings.DATABASES['default']
 
     if db_infos.get('ENGINE') != 'django.db.backends.mysql':
-        logging.warning('Failed to init seahub db, only mysql db supported.')
+        _logger.warning('Failed to init seahub db, only mysql db supported.')
         return
     
     db_host = db_infos.get('HOST', '127.0.0.1')
     db_port = int(db_infos.get('PORT', '3306'))
     db_name = db_infos.get('NAME')
     if not db_name:
-        logging.warning ('Failed to init seahub db, db name is not set.')
+        _logger.warning ('Failed to init seahub db, db name is not set.')
         return
     db_user = db_infos.get('USER')
     if not db_user:
-        logging.warning ('Failed to init seahub db, db user is not set.')
+        _logger.warning ('Failed to init seahub db, db user is not set.')
         return
     db_passwd = db_infos.get('PASSWORD')
 
