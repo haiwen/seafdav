@@ -6,7 +6,6 @@ import wsgidav.util as util
 
 import seahub_db
 from seahub_db import Base
-import seahub_settings
 
 _logger = util.getModuleLogger(__name__)
 
@@ -78,6 +77,7 @@ class SeafileDomainController(object):
                     return False
                 else:
                     from Crypto.Cipher import AES
+                    import seahub_settings
                     secret = seahub_settings.SECRET_KEY[:BLOCK_SIZE]
                     cipher = AES.new(secret, AES.MODE_ECB)
                     encoded_str = 'aes$' + EncodeAES(cipher, password)
