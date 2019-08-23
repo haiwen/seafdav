@@ -1,73 +1,33 @@
-# ![logo](https://raw.githubusercontent.com/mar10/wsgidav/master/doc/logo.png) WsgiDAV
-[![Build Status](https://travis-ci.org/mar10/wsgidav.svg?branch=master)](https://travis-ci.org/mar10/wsgidav)
-[![Latest Version](https://img.shields.io/pypi/v/wsgidav.svg)](https://pypi.python.org/pypi/WsgiDAV/)
-[![License](https://img.shields.io/pypi/l/wsgidav.svg)](https://github.com/mar10/wsgidav/blob/master/LICENSE)
-[![Documentation Status](https://readthedocs.org/projects/wsgidav/badge/?version=latest)](http://wsgidav.readthedocs.io/)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
-[![StackOverflow: WsgiDAV](https://img.shields.io/badge/StackOverflow-WsgiDAV-blue.svg)](https://stackoverflow.com/questions/tagged/WsgiDAV)
+# Seafile WebDAV Server [![Build Status](https://secure.travis-ci.org/haiwen/seafdav.svg?branch=master)](http://travis-ci.org/haiwen/seafdav)
 
-A generic and extendable [WebDAV](http://www.ietf.org/rfc/rfc4918.txt) server
-written in Python and based on [WSGI](http://www.python.org/dev/peps/pep-3333/).
+This is the WebDAV server for seafile.
 
-Main features:
+See [Seafile Server Manual](http://manual.seafile.com/extension/webdav.html) for details.
 
-  - WsgiDAV is a stand-alone WebDAV server with SSL support, that can be
-    installed and run as Python command line script on Linux, OSX, and Windows:<br>
-    ```
-    $ pip install wsgidav cheroot
-    $ wsgidav --host=0.0.0.0 --port=8080 --root=/tmp
-    WARNING: share '/' will allow anonymous access.
-    Running WsgiDAV/2.2.2 Cheroot/5.5.0 Python/3.4.2
-    Serving on http://0.0.0.0:8080 ...
-    ```
-    Run `wsgidav --help` for a list of available options.<br>
-    **Note:** The syntax changed slightly with v3.0.
-  - **Note:** Windows users may prefer the
-    [MSI Installer](https://github.com/mar10/wsgidav/releases/latest)
-    (see <kbd>Assets</kbd> section).
-  - WebDAV is a superset of HTTP, so WsgiDAV is also a performant, multi-threaded
-    web server with SSL support.
-  - WsgiDAV is also a Python library that implements the WSGI protocol and can
-	  be run behind any WSGI compliant web server.<br>
-  - WsgiDAV is implemented as a configurable stack of WSGI middleware
-    applications.<br>
-    Its open architecture allows to extend the functionality and integrate
-    WebDAV services into your project.<br>
-  	Typical use cases are:
-  	- Expose data structures as virtual, editable file systems.
-  	- Allow online editing of MS Office documents.
+# Running
 
+There are two templates for running seafdav:
+- run.sh.template: This is for running seafdav on the default 8080 port with a built-in CherryPy server.
+- run-fcgi.sh.template and seafdav.conf.template:
+  These two files are for running seafdav on fastcgi mode.
 
-## Status
+To run on 8080 port:
 
-[![Latest Version](https://img.shields.io/pypi/v/wsgidav.svg)](https://pypi.python.org/pypi/WsgiDAV/)
-See the ([change log](https://github.com/mar10/wsgidav/blob/master/CHANGELOG.md)) for details.
+```
+cp run.sh.template run.sh
+```
 
-**Note:** Release 3.0 introduces some refactorings and breaking changes.<br>
-  See the ([change log](https://github.com/mar10/wsgidav/blob/master/CHANGELOG.md)) for details.
+Then change CCNET_CONF_DIR and SEAFILE_CONF_DIR to your Seafile server's settings.
 
+# Testing
 
-## More info
-
-  * [Read The Docs](http://wsgidav.rtfd.org) for details.
-  * [Discussion Group](https://groups.google.com/forum/#!forum/wsgidav)
-  * [Stackoverflow](http://stackoverflow.com/questions/tagged/wsgidav)
-
-
-## Credits
-
-Contributors:
-
-  * WsgiDAV is a [refactored version](https://github.com/mar10/wsgidav/blob/master/doc/changelog04.md)
-    of [PyFileServer 0.2](https://github.com/cwho/pyfileserver),
-    Copyright (c) 2005 Ho Chun Wei.<br>
-    Chun gave his approval to change the license from LGPL to MIT-License for
-    this project.
-  * <https://github.com/mar10/wsgidav/contributors>
-  * Markus Majer for providing the logo (a mixture of the international
-    maritime signal flag for 'W (Whiskey)' and a dove.)
-
-
-Any kind of feedback is very welcome!<br>
-Have fun  :-)<br>
-Martin
+- start local seafile server
+- start local seahub server (While seafdav itself doesn't require seahub, we use seahub webapi as a driver for testing)
+- start seafdav server
+- create a test user `test@seafiltest.com` with password `test`
+- Run the tests
+```
+export CCNET_CONF_DIR=/path/to/ccnet
+export SEAFILE_CONF_DIR=/path/to/seafile-data
+./functest.sh test
+```

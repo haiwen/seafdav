@@ -1,0 +1,10 @@
+#!/bin/bash
+
+export CCNET_CONF_DIR=/data/data/ccnet
+export SEAFILE_CONF_DIR=/data/data/seafile-data
+
+TOP_DIR=$(python -c "import os; print os.path.dirname(os.path.realpath('$0'))")
+
+cd "$TOP_DIR"
+
+python -m wsgidav.server.run_server --host=0.0.0.0 --port=8080 --root=/ --server=gunicorn
