@@ -49,6 +49,8 @@ from wsgidav.default_conf import DEFAULT_CONFIG, DEFAULT_VERBOSE
 from wsgidav.fs_dav_provider import FilesystemProvider
 from wsgidav.wsgidav_app import WsgiDAVApp
 from wsgidav.xml_tools import use_lxml
+from wsgidav.dc.domain_controller import SeafileDomainController
+from wsgidav.seafile_dav_provider import SeafileProvider
 
 try:
     # Try pyjson5 first because it's faster than json5
@@ -179,6 +181,11 @@ See https://github.com/mar10/wsgidav for additional information.
         help="used by 'cheroot' server if SSL certificates are configured "
         "(default: builtin).",
     )
+    parser.add_argument(
+        "--pid",
+        dest="pidfile",
+        help="PID file path",
+    )
 
     qv_group = parser.add_mutually_exclusive_group()
     qv_group.add_argument(
@@ -276,6 +283,44 @@ See https://github.com/mar10/wsgidav for additional information.
     return cmdLineOpts, parser
 
 
+def _loadSeafileSettings(config):
+    # Seafile cannot support digest auth, since plain text password is needed.
+    config['http_authenticator'] = {
+        'accept_basic': True,
+        'accept_digest': False,
+        'default_to_digest': False,
+        'domain_controller': SeafileDomainController
+    }
+    # Load share_name from seafdav config file
+
+    # haiwen
+    #   - conf
+    #     - seafdav.conf
+
+    ##### a sample seafdav.conf, we only care: "share_name"
+    # [WEBDAV]
+    # enabled = true
+    # port = 8080
+    # share_name = /seafdav
+    ##### a sample seafdav.conf
+
+    share_name = '/'
+
+    seafdav_conf = os.environ.get('SEAFDAV_CONF')
+    if seafdav_conf and os.path.exists(seafdav_conf):
+        import configparser
+        cp = configparser.ConfigParser()
+        cp.read(seafdav_conf)
+        section_name = 'WEBDAV'
+
+        if cp.has_option(section_name, 'share_name'):
+            share_name = cp.get(section_name, 'share_name')
+
+    # Setup provider mapping for Seafile. E.g. /seafdav -> seafile provider.
+    provider_mapping = {}
+    provider_mapping[share_name] = SeafileProvider()
+    config['provider_mapping'] = provider_mapping
+
 def _read_config_file(config_file, _verbose):
     """Read configuration file options into a dictionary."""
 
@@ -361,6 +406,12 @@ def _init_config():
     if not config["provider_mapping"]:
         parser.error("No DAV provider defined.")
 
+    _loadSeafileSettings(config)
+
+    pid_file = cli_opts.get("pidfile")
+    if pid_file:
+        pid_file = os.path.abspath(pid_file)
+        config["pidfile"] = pid_file
     # Quick-configuration of DomainController
     auth = cli_opts.get("auth")
     auth_conf = util.get_dict_value(config, "http_authenticator", as_dict=True)
@@ -425,6 +476,34 @@ def _init_config():
     #     # pydevd.settrace()
 
     return cli_opts, config
+
+import gunicorn.app.base
+from gunicorn.six import iteritems
+
+class GunicornApplication(gunicorn.app.base.BaseApplication):
+
+    def __init__(self, app, options=None):
+        self.options = options or {}
+        self.application = app
+        super(GunicornApplication, self).__init__()
+
+    def load_config(self):
+        config = dict([(key, value) for key, value in iteritems(self.options)
+                       if key in self.cfg.settings and value is not None])
+        for key, value in iteritems(config):
+            self.cfg.set(key.lower(), value)
+
+    def load(self):
+        return self.application
+
+def _run_gunicorn(app, config, mode):
+    options = {
+        'bind': '%s:%s' % (config.get('host'), config.get('port')),
+        'workers': 5,
+        "pidfile": config.get('pidfile'), 
+    }
+
+    GunicornApplication(app, options).run()
 
 
 def _run_cheroot(app, config, _server):
@@ -780,6 +859,9 @@ def _run_wsgiref(app, config, _server):
 
 
 SUPPORTED_SERVERS = {
+    "gunicorn": _run_gunicorn,
+    "paste": _run_paste,
+    "gevent": _run_gevent,
     "cheroot": _run_cheroot,
     # "cherrypy": _run__cherrypy,
     "ext-wsgiutils": _run_ext_wsgiutils,
