@@ -4,3 +4,5 @@ json5~=0.8.5
 python-pam~=1.8
 PyYAML~=5.1
 six~=1.13
+lxml
+sqlalchemy
