@@ -194,13 +194,17 @@ def init_logging(config):
         "logger_format",
         "%(asctime)s.%(msecs)03d - <%(thread)d> %(name)-27s %(levelname)-8s:  %(message)s",
     )
-
+    log_file = config.get('log_file', None)
+    if not log_file:
+        myHandler = logging.StreamHandler(sys.stdout)
+    else:
+        myHandler = logging.FileHandler(log_file)
     formatter = logging.Formatter(logger_format, logger_date_format)
 
     # Define handlers
-    consoleHandler = logging.StreamHandler(sys.stdout)
+    #consoleHandler = logging.StreamHandler(sys.stdout)
     #    consoleHandler = logging.StreamHandler(sys.stderr)
-    consoleHandler.setFormatter(formatter)
+    myHandler.setFormatter(formatter)
     # consoleHandler.setLevel(logging.DEBUG)
 
     # Add the handlers to the base logger
@@ -232,7 +236,7 @@ def init_logging(config):
             pass
         logger.removeHandler(hdlr)
 
-    logger.addHandler(consoleHandler)
+    logger.addHandler(myHandler)
 
     if verbose >= 3:
         for e in enable_loggers:

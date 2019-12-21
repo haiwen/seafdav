@@ -178,6 +178,11 @@ See https://github.com/mar10/wsgidav for additional information.
         dest="pidfile",
         help="PID file path",
     )
+    parser.add_argument(
+        "--log-file",
+        dest="log_file",
+        help="log file path",
+    )
 
     qv_group = parser.add_mutually_exclusive_group()
     qv_group.add_argument(
@@ -381,6 +386,9 @@ def _init_config():
             print("Running without configuration file.")
 
     # Command line overrides file
+    if cli_opts.get("log_file"):
+        log_file = cli_opts.get("log_file")
+        config['log_file'] = log_file
     if cli_opts.get("port"):
         config["port"] = cli_opts.get("port")
     if cli_opts.get("host"):
@@ -480,19 +488,18 @@ def _init_config():
     return config
 
 import gunicorn.app.base
-from gunicorn.six import iteritems
 
 class GunicornApplication(gunicorn.app.base.BaseApplication):
 
     def __init__(self, app, options=None):
         self.options = options or {}
         self.application = app
-        super(GunicornApplication, self).__init__()
+        super().__init__()
 
     def load_config(self):
-        config = dict([(key, value) for key, value in iteritems(self.options)
-                       if key in self.cfg.settings and value is not None])
-        for key, value in iteritems(config):
+        config = {key: value for key, value in self.options.items()
+                  if key in self.cfg.settings and value is not None}
+        for key, value in config.items():
             self.cfg.set(key.lower(), value)
 
     def load(self):

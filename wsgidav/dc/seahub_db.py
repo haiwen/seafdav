@@ -19,6 +19,8 @@ def init_db_session_class():
         Base.prepare(engine, reflect=True)
         Session = sessionmaker(bind=engine)
         return Session
+    except ImportError:
+        return None
     except Exception as e:
         _logger.warning('Failed to init seahub db: %s.', e)
         return None
