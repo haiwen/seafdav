@@ -13,7 +13,7 @@ _logger = util.get_module_logger(__name__)
 BLOCK_SIZE = 32
 
 import base64
-PADDING = '{'
+PADDING = b'{'
 
 # An encrypted block size must be a multiple of 16
 pad = lambda s: s + (16 - len(s) % 16) * PADDING
@@ -63,7 +63,7 @@ class SeafileDomainController(BaseDomainController):
                 ccnet_email = user.email
             else:
                 if session:
-                    profile_profile = Base.classes.profile_profile
+                    profile_profile = seahub_db.Base.classes.profile_profile
                     q = session.query(profile_profile.user).filter(profile_profile.contact_email==username)
                     res = q.first()
                     if res:
@@ -82,9 +82,9 @@ class SeafileDomainController(BaseDomainController):
                     from Crypto.Cipher import AES
                     import seahub_settings
                     secret = seahub_settings.SECRET_KEY[:BLOCK_SIZE]
-                    cipher = AES.new(secret, AES.MODE_ECB)
-                    encoded_str = 'aes$' + EncodeAES(cipher, password)
-                    options_useroptions = Base.classes.options_useroptions
+                    cipher = AES.new(secret.encode('utf8'), AES.MODE_ECB)
+                    encoded_str = 'aes$' + EncodeAES(cipher, password.encode('utf8')).decode('utf8')
+                    options_useroptions = seahub_db.Base.classes.options_useroptions
                     q = session.query(options_useroptions.email)
                     q = q.filter(options_useroptions.email==ccnet_email,
                                  options_useroptions.option_val==encoded_str)
