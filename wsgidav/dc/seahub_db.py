@@ -47,7 +47,7 @@ def create_seahub_db_engine():
         return
     db_passwd = db_infos.get('PASSWORD')
 
-    db_url = "mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8" % (db_user, quote_plus(db_passwd), db_host, db_port, db_name)
+    db_url = "mysql+pymysql://%s:%s@%s:%s/%s?charset=utf8" % (db_user, quote_plus(db_passwd), db_host, db_port, db_name)
 
     # Add pool recycle, or mysql connection will be closed by mysqld if idle
     # for too long.
