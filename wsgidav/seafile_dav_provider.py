@@ -71,7 +71,10 @@ class SeafileResource(DAVNonCollection):
         # XXX: What about not return last modified for files in v0 repos,
         # since they can be too expensive sometimes?
         parent, filename = os.path.split(self.rel_path)
-        mtimes = seafile_api.get_files_last_modified(self.repo.id, parent, -1)
+        try:
+            mtimes = seafile_api.get_files_last_modified(self.repo.id, parent, -1)
+        except SearpcError:
+            raise DAVError(HTTP_INTERNAL_ERROR)
         for mtime in mtimes:
             if (mtime.file_name == filename):
                 return mtime.last_modified
@@ -102,12 +105,18 @@ class SeafileResource(DAVNonCollection):
             # When client use "transfer-encode: chunking", the content length
             # is not included in the request headers
             if isnewfile:
-                return seafile_api.check_quota(self.repo.id) >= 0
+                try:
+                    return seafile_api.check_quota(self.repo.id) >= 0
+                except SearpcError:
+                    raise DAVError(HTTP_INTERNAL_ERROR)
             else:
                 return True
         else:
             delta = contentlength - self.obj.size
-            return seafile_api.check_quota(self.repo.id, delta) >= 0
+            try:
+                return seafile_api.check_quota(self.repo.id, delta) >= 0
+            except SearpError:
+                raise DAVError(HTTP_INTERNAL_ERROR)
 
     def begin_write(self, content_type=None, isnewfile=True, contentlength=-1):
         """Open content as a stream for writing.
@@ -118,8 +127,11 @@ class SeafileResource(DAVNonCollection):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
 
-        if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
-            raise DAVError(HTTP_FORBIDDEN)
+        try:
+            if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
+                raise DAVError(HTTP_FORBIDDEN)
+        except SearpcError:
+            raise DAVError(HTTP_INTERNAL_ERROR)
 
         if not self.check_repo_owner_quota(isnewfile, contentlength):
             raise DAVError(HTTP_FORBIDDEN, "The quota of the repo owner is exceeded")
@@ -134,8 +146,11 @@ class SeafileResource(DAVNonCollection):
             contentlength = os.stat(self.tmpfile_path).st_size
             if not self.check_repo_owner_quota(isnewfile=isnewfile, contentlength=contentlength):
                 raise DAVError(HTTP_FORBIDDEN, "The quota of the repo owner is exceeded")
-            seafile_api.put_file(self.repo.id, self.tmpfile_path, parent, filename,
-                                 self.username, None)
+            try:
+                seafile_api.put_file(self.repo.id, self.tmpfile_path, parent, filename,
+                                    self.username, None)
+            except SearpcError:
+                raise DAVError(HTTP_INTERNAL_ERROR)
         if self.tmpfile_path:
             try:
                 os.unlink(self.tmpfile_path)
@@ -146,11 +161,13 @@ class SeafileResource(DAVNonCollection):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
 
-        if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
-            raise DAVError(HTTP_FORBIDDEN)
-
-        parent, filename = os.path.split(self.rel_path)
-        seafile_api.del_file(self.repo.id, parent, filename, self.username)
+        try:
+            if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
+                raise DAVError(HTTP_FORBIDDEN)
+            parent, filename = os.path.split(self.rel_path)
+            seafile_api.del_file(self.repo.id, parent, filename, self.username)
+        except SearpcError:
+            raise DAVError(HTTP_INTERNAL_ERROR)
 
         return True
 
@@ -167,23 +184,26 @@ class SeafileResource(DAVNonCollection):
         dest_dir, dest_file = os.path.split(rel_path)
         dest_repo = getRepoByName(repo_name, self.username, self.org_id, self.is_guest)
 
-        if seafile_api.check_permission_by_path(dest_repo.id, self.rel_path, self.username) != "rw":
-            raise DAVError(HTTP_FORBIDDEN)
+        try:
+            if seafile_api.check_permission_by_path(dest_repo.id, self.rel_path, self.username) != "rw":
+                raise DAVError(HTTP_FORBIDDEN)
 
-        src_dir, src_file = os.path.split(self.rel_path)
-        if not src_file:
-            raise DAVError(HTTP_BAD_REQUEST)
+            src_dir, src_file = os.path.split(self.rel_path)
+            if not src_file:
+                raise DAVError(HTTP_BAD_REQUEST)
 
-        if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
-            raise DAVError(HTTP_BAD_REQUEST)
+            if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
+                raise DAVError(HTTP_BAD_REQUEST)
 
-        # some clients such as GoodReader requires "overwrite" semantics
-        file_id_dest = seafile_api.get_file_id_by_path(dest_repo.id, rel_path)
-        if file_id_dest != None:
-            seafile_api.del_file(dest_repo.id, dest_dir, dest_file, self.username)
+            # some clients such as GoodReader requires "overwrite" semantics
+            file_id_dest = seafile_api.get_file_id_by_path(dest_repo.id, rel_path)
+            if file_id_dest != None:
+                seafile_api.del_file(dest_repo.id, dest_dir, dest_file, self.username)
 
-        seafile_api.move_file(self.repo.id, src_dir, src_file,
-                              dest_repo.id, dest_dir, dest_file, 1, self.username, NEED_PROGRESS, SYNCHRONOUS)
+            seafile_api.move_file(self.repo.id, src_dir, src_file,
+                                dest_repo.id, dest_dir, dest_file, 1, self.username, NEED_PROGRESS, SYNCHRONOUS)
+        except SearpcError:
+            raise DAVError(HTTP_INTERNAL_ERROR)
 
         return True
 
@@ -200,18 +220,21 @@ class SeafileResource(DAVNonCollection):
         dest_dir, dest_file = os.path.split(rel_path)
         dest_repo = getRepoByName(repo_name, self.username, self.org_id, self.is_guest)
 
-        if seafile_api.check_permission_by_path(dest_repo.id, self.rel_path, self.username) != "rw":
-            raise DAVError(HTTP_FORBIDDEN)
+        try:
+            if seafile_api.check_permission_by_path(dest_repo.id, self.rel_path, self.username) != "rw":
+                raise DAVError(HTTP_FORBIDDEN)
 
-        src_dir, src_file = os.path.split(self.rel_path)
-        if not src_file:
-            raise DAVError(HTTP_BAD_REQUEST)
+            src_dir, src_file = os.path.split(self.rel_path)
+            if not src_file:
+                raise DAVError(HTTP_BAD_REQUEST)
 
-        if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
-            raise DAVError(HTTP_BAD_REQUEST)
+            if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
+                raise DAVError(HTTP_BAD_REQUEST)
 
-        seafile_api.copy_file(self.repo.id, src_dir, src_file,
-                              dest_repo.id, dest_dir, dest_file, self.username, NEED_PROGRESS, SYNCHRONOUS)
+            seafile_api.copy_file(self.repo.id, src_dir, src_file,
+                                dest_repo.id, dest_dir, dest_file, self.username, NEED_PROGRESS, SYNCHRONOUS)
+        except SearpcError:
+            raise DAVError(HTTP_INTERNAL_ERROR)
 
         return True
 
@@ -309,18 +332,17 @@ class SeafDirResource(DAVCollection):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
 
-        if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
-            raise DAVError(HTTP_FORBIDDEN)
-
-        if seafile_api.check_quota(self.repo.id) < 0:
-            raise DAVError(HTTP_FORBIDDEN, "The quota of the repo owner is exceeded")
-
         try:
+            if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
+                raise DAVError(HTTP_FORBIDDEN)
+
+            if seafile_api.check_quota(self.repo.id) < 0:
+                raise DAVError(HTTP_FORBIDDEN, "The quota of the repo owner is exceeded")
             seafile_api.post_empty_file(self.repo.id, self.rel_path, name, self.username)
         except SearpcError as e:
             if e.msg == 'Invalid file name':
                 raise DAVError(HTTP_BAD_REQUEST)
-            raise
+            raise DAVError(HTTP_INTERNAL_ERROR)
 
         # Repo was updated, can't use self.repo
         repo = seafile_api.get_repo(self.repo.id)
@@ -344,27 +366,33 @@ class SeafDirResource(DAVCollection):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
 
-        if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
-            raise DAVError(HTTP_FORBIDDEN)
+        try:
+            if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
+                raise DAVError(HTTP_FORBIDDEN)
 
-        if not seafile_api.is_valid_filename(self.repo.id, name):
-            raise DAVError(HTTP_BAD_REQUEST)
+            if not seafile_api.is_valid_filename(self.repo.id, name):
+                raise DAVError(HTTP_BAD_REQUEST)
 
-        seafile_api.post_dir(self.repo.id, self.rel_path, name, self.username)
+            seafile_api.post_dir(self.repo.id, self.rel_path, name, self.username)
+        except SearpcError:
+            raise DAVError(HTTP_INTERNAL_ERROR)
 
     def handle_delete(self):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
 
-        if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
-            raise DAVError(HTTP_FORBIDDEN)
+        try:
+            if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
+                raise DAVError(HTTP_FORBIDDEN)
 
-        parent, filename = os.path.split(self.rel_path)
-        # Can't delete repo root
-        if not filename:
-            raise DAVError(HTTP_BAD_REQUEST)
+            parent, filename = os.path.split(self.rel_path)
+            # Can't delete repo root
+            if not filename:
+                raise DAVError(HTTP_BAD_REQUEST)
 
-        seafile_api.del_file(self.repo.id, parent, filename, self.username)
+            seafile_api.del_file(self.repo.id, parent, filename, self.username)
+        except SearpcError:
+            raise DAVError(HTTP_INTERNAL_ERROR)
 
         return True
 
@@ -381,18 +409,21 @@ class SeafDirResource(DAVCollection):
         dest_dir, dest_file = os.path.split(rel_path)
         dest_repo = getRepoByName(repo_name, self.username, self.org_id, self.is_guest)
 
-        if seafile_api.check_permission_by_path(dest_repo.id, self.rel_path, self.username) != "rw":
-            raise DAVError(HTTP_FORBIDDEN)
+        try:
+            if seafile_api.check_permission_by_path(dest_repo.id, self.rel_path, self.username) != "rw":
+                raise DAVError(HTTP_FORBIDDEN)
 
-        src_dir, src_file = os.path.split(self.rel_path)
-        if not src_file:
-            raise DAVError(HTTP_BAD_REQUEST)
+            src_dir, src_file = os.path.split(self.rel_path)
+            if not src_file:
+                raise DAVError(HTTP_BAD_REQUEST)
 
-        if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
-            raise DAVError(HTTP_BAD_REQUEST)
+            if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
+                raise DAVError(HTTP_BAD_REQUEST)
 
-        seafile_api.move_file(self.repo.id, src_dir, src_file,
-                              dest_repo.id, dest_dir, dest_file, 0, self.username, NEED_PROGRESS, SYNCHRONOUS)
+            seafile_api.move_file(self.repo.id, src_dir, src_file,
+                                dest_repo.id, dest_dir, dest_file, 0, self.username, NEED_PROGRESS, SYNCHRONOUS)
+        except SearpcError:
+            raise DAVError(HTTP_INTERNAL_ERROR)
 
         return True
 
@@ -409,18 +440,21 @@ class SeafDirResource(DAVCollection):
         dest_dir, dest_file = os.path.split(rel_path)
         dest_repo = getRepoByName(repo_name, self.username, self.org_id, self.is_guest)
 
-        if seafile_api.check_permission_by_path(dest_repo.id, self.rel_path, self.username) != "rw":
-            raise DAVError(HTTP_FORBIDDEN)
+        try:
+            if seafile_api.check_permission_by_path(dest_repo.id, self.rel_path, self.username) != "rw":
+                raise DAVError(HTTP_FORBIDDEN)
 
-        src_dir, src_file = os.path.split(self.rel_path)
-        if not src_file:
-            raise DAVError(HTTP_BAD_REQUEST)
+            src_dir, src_file = os.path.split(self.rel_path)
+            if not src_file:
+                raise DAVError(HTTP_BAD_REQUEST)
 
-        if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
-            raise DAVError(HTTP_BAD_REQUEST)
+            if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
+                raise DAVError(HTTP_BAD_REQUEST)
 
-        seafile_api.copy_file(self.repo.id, src_dir, src_file,
-                              dest_repo.id, dest_dir, dest_file, self.username, NEED_PROGRESS, SYNCHRONOUS)
+            seafile_api.copy_file(self.repo.id, src_dir, src_file,
+                                dest_repo.id, dest_dir, dest_file, self.username, NEED_PROGRESS, SYNCHRONOUS)
+        except SearpcError:
+            raise DAVError(HTTP_INTERNAL_ERROR)
 
         return True
 
