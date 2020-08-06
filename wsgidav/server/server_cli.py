@@ -302,14 +302,18 @@ def _loadSeafileSettings(config):
     #   - conf
     #     - seafdav.conf
 
-    ##### a sample seafdav.conf, we only care: "share_name"
+    ##### a sample seafdav.conf, we only care: "share_name", "workers", "timeout"
     # [WEBDAV]
     # enabled = true
     # port = 8080
     # share_name = /seafdav
+    # workers = 5
+    # timeout = 1200
     ##### a sample seafdav.conf
 
     share_name = '/'
+    workers = 5
+    timeout = 1200
 
     seafdav_conf = os.environ.get('SEAFDAV_CONF')
     if seafdav_conf and os.path.exists(seafdav_conf):
@@ -320,11 +324,17 @@ def _loadSeafileSettings(config):
 
         if cp.has_option(section_name, 'share_name'):
             share_name = cp.get(section_name, 'share_name')
+        if cp.has_option(section_name, 'workers'):
+            workers = cp.get(section_name, 'workers')
+        if cp.has_option(section_name, 'timeout'):
+            timeout = cp.get(section_name, 'timeout')
 
     # Setup provider mapping for Seafile. E.g. /seafdav -> seafile provider.
     provider_mapping = {}
     provider_mapping[share_name] = SeafileProvider()
     config['provider_mapping'] = provider_mapping
+    config['workers'] = workers
+    config['timeout'] = timeout
 
 def _read_config_file(config_file, _verbose):
     """Read configuration file options into a dictionary."""
@@ -506,8 +516,9 @@ class GunicornApplication(gunicorn.app.base.BaseApplication):
 def _run_gunicorn(app, config, mode):
     options = {
         'bind': '%s:%s' % (config.get('host'), config.get('port')),
-        'workers': 5,
-        "pidfile": config.get('pidfile'), 
+        'workers': config.get('workers'),
+        "pidfile": config.get('pidfile'),
+        "timeout": config.get('timeout')
     }
 
     GunicornApplication(app, options).run()
