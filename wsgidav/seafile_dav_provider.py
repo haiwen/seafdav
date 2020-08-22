@@ -425,9 +425,10 @@ class SeafDirResource(DAVCollection):
         return True
 
 class RootResource(DAVCollection):
-    def __init__(self, username, environ):
+    def __init__(self, username, environ, show_repo_id):
         super(RootResource, self).__init__("/", environ)
         self.username = username
+        self.show_repo_id = show_repo_id
         self.org_id = environ.get('seafile.org_id', '')
         self.is_guest = environ.get('seafile.is_guest', False)
 
@@ -492,7 +493,10 @@ class RootResource(DAVCollection):
         for r_list in name_hash.values():
             if len(r_list) == 1:
                 repo = r_list[0]
-                res = self._createRootRes(repo, repo.name)
+                unique_name = repo.name
+                if self.show_repo_id:
+                    unique_name = repo.name + "-" + repo.id[:6]
+                res = self._createRootRes(repo, unique_name)
                 member_list.append(res)
             else:
                 for repo in sort_repo_list(r_list):
@@ -529,9 +533,10 @@ class RootResource(DAVCollection):
 #===============================================================================
 class SeafileProvider(DAVProvider):
 
-    def __init__(self, readonly=False):
+    def __init__(self, show_repo_id, readonly=False):
         super(SeafileProvider, self).__init__()
         self.readonly = readonly
+        self.show_repo_id = show_repo_id
         self.tmpdir = os.path.join(SEAFILE_CONF_DIR, "webdavtmp")
         if not os.access(self.tmpdir, os.F_OK):
             os.mkdir(self.tmpdir)
@@ -555,7 +560,7 @@ class SeafileProvider(DAVProvider):
         is_guest = environ.get("seafile.is_guest", False)
 
         if path == "/" or path == "":
-            return RootResource(username, environ)
+            return RootResource(username, environ, self.show_repo_id)
 
         path = path.rstrip("/")
         try:
