@@ -314,6 +314,7 @@ def _loadSeafileSettings(config):
     share_name = '/'
     workers = 5
     timeout = 1200
+    show_repo_id = False
 
     seafdav_conf = os.environ.get('SEAFDAV_CONF')
     if seafdav_conf and os.path.exists(seafdav_conf):
@@ -328,10 +329,13 @@ def _loadSeafileSettings(config):
             workers = cp.get(section_name, 'workers')
         if cp.has_option(section_name, 'timeout'):
             timeout = cp.get(section_name, 'timeout')
+        if cp.has_option(section_name, 'show_repo_id'):
+            if cp.get(section_name, 'show_repo_id').lower() == 'true':
+                show_repo_id = True
 
     # Setup provider mapping for Seafile. E.g. /seafdav -> seafile provider.
     provider_mapping = {}
-    provider_mapping[share_name] = SeafileProvider()
+    provider_mapping[share_name] = SeafileProvider(show_repo_id=show_repo_id)
     config['provider_mapping'] = provider_mapping
     config['workers'] = workers
     config['timeout'] = timeout
