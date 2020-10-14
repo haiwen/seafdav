@@ -6,6 +6,7 @@ from wsgidav.dc.seaf_utils import CCNET_CONF_DIR, SEAFILE_CENTRAL_CONF_DIR, mult
 from wsgidav.dc import seahub_db
 import wsgidav.util as util
 from wsgidav.dc.base_dc import BaseDomainController
+from sqlalchemy.sql import exists
 # basic_auth_user, get_domain_realm, require_authentication
 _logger = util.get_module_logger(__name__)
 
@@ -71,9 +72,12 @@ class SeafileDomainController(BaseDomainController):
 
             if not ccnet_email:
                 _logger.warning('User %s doesn\'t exist', username)
-                if session:
-                    session.close()
                 return False
+            
+            if session:
+                if enableTwoFactorAuth(session, ccnet_email):
+                    _logger.warning("Two factor auth is enabled, no access to webdav.")
+                    return False
 
             if self.ccnet_threaded_rpc.validate_emailuser(ccnet_email, password) != 0:
                 if not session:
@@ -90,15 +94,15 @@ class SeafileDomainController(BaseDomainController):
                                  options_useroptions.option_val==encoded_str)
                     res = q.first()
                     if not res:
-                        session.close()
                         return False
 
-            if session:
-                session.close()
             username = ccnet_email
         except Exception as e:
             _logger.warning('Failed to login: %s', e)
             return False
+        finally:
+            if session:
+                session.close()
 
         try:
             user = self.ccnet_threaded_rpc.get_emailuser_with_import(username)
@@ -121,3 +125,32 @@ class SeafileDomainController(BaseDomainController):
         environ["http_authenticator.username"] = username
 
         return True
+
+def enableTwoFactorAuth(session, email):
+    import seahub_settings
+
+    enable_settings_via_web = True
+    if hasattr(seahub_settings, 'ENABLE_SETTINGS_VIA_WEB'):
+        enable_settings_via_web = seahub_settings.ENABLE_SETTINGS_VIA_WEB
+
+    global_two_factor_auth = False
+    if enable_settings_via_web:
+        constance_config = seahub_db.Base.classes.constance_config
+        q = session.query(constance_config.value).filter(constance_config.constance_key=='ENABLE_TWO_FACTOR_AUTH')
+        res = q.first()
+        if res:
+            if res[0] == 'gAJLAS4=':
+                global_two_factor_auth = True
+            else:
+                return False
+    elif hasattr(seahub_settings, 'ENABLE_TWO_FACTOR_AUTH'):
+        global_two_factor_auth = seahub_settings.ENABLE_TWO_FACTOR_AUTH
+
+    if global_two_factor_auth:
+        two_factor_staticdevice = seahub_db.Base.classes.two_factor_staticdevice
+        two_factor_totpdevice = seahub_db.Base.classes.two_factor_totpdevice
+        if session.query(exists().where(two_factor_staticdevice.user==email)).scalar() \
+            or session.query(exists().where(two_factor_totpdevice.user==email)).scalar():
+            return True
+
+    return False
