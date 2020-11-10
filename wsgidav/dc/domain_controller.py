@@ -1,6 +1,6 @@
 import os
 import posixpath
-import ccnet
+from seaserv import ccnet_api as api
 from pysearpc import SearpcError
 from wsgidav.dc.seaf_utils import CCNET_CONF_DIR, SEAFILE_CENTRAL_CONF_DIR, multi_tenancy_enabled
 from wsgidav.dc import seahub_db
@@ -24,7 +24,6 @@ EncodeAES = lambda c, s: base64.b64encode(c.encrypt(pad(s)))
 class SeafileDomainController(BaseDomainController):
 
     def __init__(self, wsgidav_app, config):
-        self.ccnet_threaded_rpc = ccnet.CcnetThreadedRpcClient(posixpath.join(CCNET_CONF_DIR, 'ccnet-rpc.sock'))
         self.session_cls = seahub_db.init_db_session_class()
 
     def __repr__(self):
@@ -59,7 +58,7 @@ class SeafileDomainController(BaseDomainController):
             if self.session_cls:
                 session = self.session_cls()
 
-            user = self.ccnet_threaded_rpc.get_emailuser(username)
+            user = api.get_emailuser(username)
             if user:
                 ccnet_email = user.email
             else:
@@ -79,7 +78,7 @@ class SeafileDomainController(BaseDomainController):
                     _logger.warning("Two factor auth is enabled, no access to webdav.")
                     return False
 
-            if self.ccnet_threaded_rpc.validate_emailuser(ccnet_email, password) != 0:
+            if api.validate_emailuser(ccnet_email, password) != 0:
                 if not session:
                     return False
                 else:
@@ -105,7 +104,7 @@ class SeafileDomainController(BaseDomainController):
                 session.close()
 
         try:
-            user = self.ccnet_threaded_rpc.get_emailuser_with_import(username)
+            user = api.get_emailuser_with_import(username)
             if user.role == 'guest':
                 environ['seafile.is_guest'] = True
             else:
@@ -115,7 +114,7 @@ class SeafileDomainController(BaseDomainController):
 
         if multi_tenancy_enabled():
             try:
-                orgs = self.ccnet_threaded_rpc.get_orgs_by_user(username)
+                orgs = api.get_orgs_by_user(username)
                 if orgs:
                     environ['seafile.org_id'] = orgs[0].org_id
             except Exception as e:
