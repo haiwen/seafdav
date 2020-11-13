@@ -522,7 +522,7 @@ class GunicornApplication(gunicorn.app.base.BaseApplication):
 def _run_gunicorn(app, config, mode):
     options = {
         'bind': '%s:%s' % (config.get('host'), config.get('port')),
-        'workers': config.get('workers'),
+        'threads': config.get('workers'),
         "pidfile": config.get('pidfile'),
         "timeout": config.get('timeout')
     }
