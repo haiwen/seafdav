@@ -1,5 +1,6 @@
 import os
 import posixpath
+import seahub_settings
 from seaserv import ccnet_api as api
 from pysearpc import SearpcError
 from wsgidav.dc.seaf_utils import CCNET_CONF_DIR, SEAFILE_CENTRAL_CONF_DIR, multi_tenancy_enabled
@@ -73,17 +74,23 @@ class SeafileDomainController(BaseDomainController):
                 _logger.warning('User %s doesn\'t exist', username)
                 return False
             
-            if session:
-                if enableTwoFactorAuth(session, ccnet_email):
-                    _logger.warning("Two factor auth is enabled, no access to webdav.")
-                    return False
+            enable_webdav_secret = False
+            if hasattr(seahub_settings, 'ENABLE_WEBDAV_SECRET'):
+                enable_webdav_secret = seahub_settings.ENABLE_WEBDAV_SECRET
+            
+            enable_two_factor_auth = False
+            if session and enableTwoFactorAuth(session, ccnet_email):
+                enable_two_factor_auth = True
+            
+            if not enable_webdav_secret and enable_two_factor_auth:
+                _logger.warning("Two factor auth is enabled, no access to webdav.")
+                return False
 
-            if api.validate_emailuser(ccnet_email, password) != 0:
+            if enable_webdav_secret: 
                 if not session:
                     return False
                 else:
                     from Crypto.Cipher import AES
-                    import seahub_settings
                     secret = seahub_settings.SECRET_KEY[:BLOCK_SIZE]
                     cipher = AES.new(secret.encode('utf8'), AES.MODE_ECB)
                     encoded_str = 'aes$' + EncodeAES(cipher, password.encode('utf8')).decode('utf8')
@@ -94,6 +101,8 @@ class SeafileDomainController(BaseDomainController):
                     res = q.first()
                     if not res:
                         return False
+            elif api.validate_emailuser(ccnet_email, password) != 0:
+                return False
 
             username = ccnet_email
         except Exception as e:
@@ -126,8 +135,6 @@ class SeafileDomainController(BaseDomainController):
         return True
 
 def enableTwoFactorAuth(session, email):
-    import seahub_settings
-
     enable_settings_via_web = True
     if hasattr(seahub_settings, 'ENABLE_SETTINGS_VIA_WEB'):
         enable_settings_via_web = seahub_settings.ENABLE_SETTINGS_VIA_WEB
