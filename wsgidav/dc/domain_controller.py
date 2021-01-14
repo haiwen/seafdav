@@ -85,24 +85,16 @@ class SeafileDomainController(BaseDomainController):
             if not enable_webdav_secret and enable_two_factor_auth:
                 _logger.warning("Two factor auth is enabled, no access to webdav.")
                 return False
-
-            if enable_webdav_secret: 
-                if not session:
+            elif enable_webdav_secret and enable_two_factor_auth:
+                if not validateSecret(session, password, ccnet_email):
                     return False
-                else:
-                    from Crypto.Cipher import AES
-                    secret = seahub_settings.SECRET_KEY[:BLOCK_SIZE]
-                    cipher = AES.new(secret.encode('utf8'), AES.MODE_ECB)
-                    encoded_str = 'aes$' + EncodeAES(cipher, password.encode('utf8')).decode('utf8')
-                    options_useroptions = seahub_db.Base.classes.options_useroptions
-                    q = session.query(options_useroptions.email)
-                    q = q.filter(options_useroptions.email==ccnet_email,
-                                 options_useroptions.option_val==encoded_str)
-                    res = q.first()
-                    if not res:
-                        return False
-            elif api.validate_emailuser(ccnet_email, password) != 0:
-                return False
+            elif not enable_webdav_secret and not enable_two_factor_auth:
+                if api.validate_emailuser(ccnet_email, password) != 0:
+                    return False
+            else:
+                if not validateSecret(session, password, ccnet_email) and \
+                api.validate_emailuser(ccnet_email, password) != 0:
+                    return False
 
             username = ccnet_email
         except Exception as e:
@@ -133,6 +125,22 @@ class SeafileDomainController(BaseDomainController):
         environ["http_authenticator.username"] = username
 
         return True
+
+def validateSecret(session, password, ccnet_email):
+    if not session:
+        return False
+    from Crypto.Cipher import AES
+    secret = seahub_settings.SECRET_KEY[:BLOCK_SIZE]
+    cipher = AES.new(secret.encode('utf8'), AES.MODE_ECB)
+    encoded_str = 'aes$' + EncodeAES(cipher, password.encode('utf8')).decode('utf8')
+    options_useroptions = seahub_db.Base.classes.options_useroptions
+    q = session.query(options_useroptions.email)
+    q = q.filter(options_useroptions.email==ccnet_email,
+                    options_useroptions.option_val==encoded_str)
+    res = q.first()
+    if not res:
+        return False
+    return True
 
 def enableTwoFactorAuth(session, email):
     enable_settings_via_web = True
