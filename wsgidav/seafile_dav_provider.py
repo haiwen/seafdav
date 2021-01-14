@@ -1,9 +1,11 @@
 from wsgidav.dav_error import DAVError, HTTP_BAD_REQUEST, HTTP_FORBIDDEN, \
     HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR
 from wsgidav.dav_provider import DAVProvider, DAVCollection, DAVNonCollection
+from threading import Timer
 
 import wsgidav.util as util
 import os
+import time
 import posixpath
 
 import tempfile
@@ -30,7 +32,7 @@ def sort_repo_list(repos):
 # SeafileResource
 #===============================================================================
 class SeafileResource(DAVNonCollection):
-    def __init__(self, path, repo, rel_path, obj, environ):
+    def __init__(self, path, repo, rel_path, obj, environ, block_map={}):
         super(SeafileResource, self).__init__(path, environ)
         self.repo = repo
         self.rel_path = rel_path
@@ -40,6 +42,7 @@ class SeafileResource(DAVNonCollection):
         self.is_guest = environ.get("seafile.is_guest", False)
         self.tmpfile_path = None
         self.owner = None
+        self.block_map = block_map 
 
     # Getter methods for standard live properties
     def get_content_length(self):
@@ -81,7 +84,7 @@ class SeafileResource(DAVNonCollection):
     def support_etag(self):
         return True
     def support_ranges(self):
-        return False
+        return True 
 
     def get_content(self):
         """Open content as a stream for reading.
@@ -89,7 +92,7 @@ class SeafileResource(DAVNonCollection):
         See DAVResource.getContent()
         """
         assert not self.is_collection
-        return self.obj.get_stream()
+        return self.obj.get_stream(self.block_map)
 
     def check_repo_owner_quota(self, isnewfile=True, contentlength=-1):
         """Check if the upload would cause the user quota be exceeded
@@ -538,8 +541,20 @@ class SeafileProvider(DAVProvider):
         self.readonly = readonly
         self.show_repo_id = show_repo_id
         self.tmpdir = os.path.join(SEAFILE_CONF_DIR, "webdavtmp")
+        self.block_map = {} 
+        self.clean_block_map_task_started = False
         if not os.access(self.tmpdir, os.F_OK):
             os.mkdir(self.tmpdir)
+
+    def clean_block_map_per_hour(self):
+        delete_items = []
+        for obj_id, block in self.block_map.items():
+            if time.time() - block.timestamp >= 3600*24:
+                delete_items.append(obj_id)
+        for i in range(len(delete_items)):
+            self.block_map.pop(delete_items[i])
+        t = Timer(3600, self.clean_block_map_per_hour)
+        t.start()
 
     def __repr__(self):
         rw = "Read-Write"
@@ -553,6 +568,10 @@ class SeafileProvider(DAVProvider):
 
         See DAVProvider.getResourceInst()
         """
+        if not self.clean_block_map_task_started:
+            self.clean_block_map_task_started = True
+            self.clean_block_map_per_hour()
+
         self._count_get_resource_inst += 1
 
         username = environ.get("http_authenticator.username", "")
@@ -572,7 +591,7 @@ class SeafileProvider(DAVProvider):
 
         if isinstance(obj, SeafDir):
             return SeafDirResource(path, repo, rel_path, obj, environ)
-        return SeafileResource(path, repo, rel_path, obj, environ)
+        return SeafileResource(path, repo, rel_path, obj, environ, self.block_map)
 
 def resolvePath(path, username, org_id, is_guest):
     segments = path.strip("/").split("/")
