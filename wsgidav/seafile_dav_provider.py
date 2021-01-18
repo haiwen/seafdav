@@ -1,7 +1,7 @@
 from wsgidav.dav_error import DAVError, HTTP_BAD_REQUEST, HTTP_FORBIDDEN, \
     HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR
 from wsgidav.dav_provider import DAVProvider, DAVCollection, DAVNonCollection
-from threading import Timer
+from threading import Timer, Lock
 
 import wsgidav.util as util
 import os
@@ -14,6 +14,7 @@ from seaserv import seafile_api, CALC_SHARE_USAGE
 from pysearpc import SearpcError
 from seafobj import commit_mgr, fs_mgr
 from seafobj.fs import SeafFile, SeafDir
+from seafobj.blocks import block_mgr
 from wsgidav.dc.seaf_utils import SEAFILE_CONF_DIR
 
 __docformat__ = "reStructuredText"
@@ -28,11 +29,91 @@ INFINITE_QUOTA = -2
 def sort_repo_list(repos):
     return sorted(repos, key = lambda r: r.id)
 
+class BlockMap(object):
+    def __init__(self):
+        self.block_sizes = []
+        self.timestamp = time.time()
+
+class SeafileStream(object):
+    '''Implements basic file-like interface'''
+    def __init__(self, file_obj, block_map, block_map_lock):
+        self.file_obj = file_obj
+        self.block = None
+        self.block_idx = 0
+        self.block_offset = 0
+        self.block_map = block_map
+        self.block_map_lock = block_map_lock
+
+    def read(self, size):
+        remain = size
+        blocks = self.file_obj.blocks
+        ret = b''
+
+        while True:
+            if not self.block or self.block_offset == len(self.block):
+                if self.block_idx == len(blocks):
+                    break
+                self.block = block_mgr.load_block(self.file_obj.store_id,
+                                                  self.file_obj.version,
+                                                  blocks[self.block_idx])
+                self.block_idx += 1
+                self.block_offset = 0
+
+            if self.block_offset + remain >= len(self.block):
+                ret += self.block[self.block_offset:]
+                remain -= (len(self.block) - self.block_offset)
+                self.block_offset = len(self.block)
+            else:
+                ret += self.block[self.block_offset:self.block_offset+remain]
+                self.block_offset += remain
+                remain = 0
+
+            if remain == 0:
+                break
+
+        return ret
+
+    def close(self):
+        pass
+
+    def seek(self, pos):
+        self.block = None
+        self.block_idx = 0
+        self.block_offset = 0
+
+        current_pos = pos
+        if current_pos == 0: 
+            return
+
+        with self.block_map_lock:
+            if self.file_obj.obj_id not in self.block_map:
+                block_map = BlockMap()
+                for i in range(len(self.file_obj.blocks)):
+                    block_size = block_mgr.stat_block(self.file_obj.store_id, self.file_obj.version, self.file_obj.blocks[i])
+                    block_map.block_sizes.append(block_size)
+                self.block_map[self.file_obj.obj_id] = block_map
+
+            block_map = self.block_map[self.file_obj.obj_id]        
+            block_map.timestamp = time.time()
+            while current_pos > 0:
+                if self.block_idx == len(self.file_obj.blocks):
+                    break
+                block_size = block_map.block_sizes[self.block_idx]
+                self.block_idx += 1
+                if current_pos >= block_size:
+                    current_pos -= block_size
+                    self.block_offset = block_size
+                else:
+                    self.block_offset = current_pos
+                    current_pos = 0
+                if current_pos == 0:
+                    self.block = block_mgr.load_block(self.file_obj.store_id, self.file_obj.version, self.file_obj.blocks[self.block_idx-1])
+
 #===============================================================================
 # SeafileResource
 #===============================================================================
 class SeafileResource(DAVNonCollection):
-    def __init__(self, path, repo, rel_path, obj, environ, block_map={}):
+    def __init__(self, path, repo, rel_path, obj, environ, block_map={}, block_map_lock=None):
         super(SeafileResource, self).__init__(path, environ)
         self.repo = repo
         self.rel_path = rel_path
@@ -42,7 +123,8 @@ class SeafileResource(DAVNonCollection):
         self.is_guest = environ.get("seafile.is_guest", False)
         self.tmpfile_path = None
         self.owner = None
-        self.block_map = block_map 
+        self.block_map = block_map
+        self.block_map_lock = block_map_lock
 
     # Getter methods for standard live properties
     def get_content_length(self):
@@ -92,7 +174,7 @@ class SeafileResource(DAVNonCollection):
         See DAVResource.getContent()
         """
         assert not self.is_collection
-        return self.obj.get_stream(self.block_map)
+        return SeafileStream(self.obj, self.block_map, self.block_map_lock)
 
     def check_repo_owner_quota(self, isnewfile=True, contentlength=-1):
         """Check if the upload would cause the user quota be exceeded
@@ -541,18 +623,20 @@ class SeafileProvider(DAVProvider):
         self.readonly = readonly
         self.show_repo_id = show_repo_id
         self.tmpdir = os.path.join(SEAFILE_CONF_DIR, "webdavtmp")
-        self.block_map = {} 
+        self.block_map = {}
+        self.block_map_lock = Lock()
         self.clean_block_map_task_started = False
         if not os.access(self.tmpdir, os.F_OK):
             os.mkdir(self.tmpdir)
 
     def clean_block_map_per_hour(self):
         delete_items = []
-        for obj_id, block in self.block_map.items():
-            if time.time() - block.timestamp >= 3600*24:
-                delete_items.append(obj_id)
-        for i in range(len(delete_items)):
-            self.block_map.pop(delete_items[i])
+        with self.block_map_lock:
+            for obj_id, block in self.block_map.items():
+                if time.time() - block.timestamp >= 3600*24:
+                    delete_items.append(obj_id)
+            for i in range(len(delete_items)):
+                self.block_map.pop(delete_items[i])
         t = Timer(3600, self.clean_block_map_per_hour)
         t.start()
 
@@ -568,6 +652,9 @@ class SeafileProvider(DAVProvider):
 
         See DAVProvider.getResourceInst()
         """
+
+        # start the scheduled task of cleaning up the block map here,
+        # because __init__ runs in a separate process.
         if not self.clean_block_map_task_started:
             self.clean_block_map_task_started = True
             self.clean_block_map_per_hour()
@@ -591,7 +678,7 @@ class SeafileProvider(DAVProvider):
 
         if isinstance(obj, SeafDir):
             return SeafDirResource(path, repo, rel_path, obj, environ)
-        return SeafileResource(path, repo, rel_path, obj, environ, self.block_map)
+        return SeafileResource(path, repo, rel_path, obj, environ, self.block_map, self.block_map_lock)
 
 def resolvePath(path, username, org_id, is_guest):
     segments = path.strip("/").split("/")
