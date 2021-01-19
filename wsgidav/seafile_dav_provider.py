@@ -50,19 +50,19 @@ class SeafileStream(object):
         ret = b''
 
         while True:
-            if not self.block or self.block_offset == len(self.block):
+            if not self.block:
                 if self.block_idx == len(blocks):
                     break
                 self.block = block_mgr.load_block(self.file_obj.store_id,
                                                   self.file_obj.version,
                                                   blocks[self.block_idx])
-                self.block_idx += 1
-                self.block_offset = 0
 
             if self.block_offset + remain >= len(self.block):
+                self.block_idx += 1
                 ret += self.block[self.block_offset:]
                 remain -= (len(self.block) - self.block_offset)
-                self.block_offset = len(self.block)
+                self.block = None
+                self.block_offset = 0
             else:
                 ret += self.block[self.block_offset:self.block_offset+remain]
                 self.block_offset += remain
@@ -92,22 +92,20 @@ class SeafileStream(object):
                     block_size = block_mgr.stat_block(self.file_obj.store_id, self.file_obj.version, self.file_obj.blocks[i])
                     block_map.block_sizes.append(block_size)
                 self.block_map[self.file_obj.obj_id] = block_map
-
             block_map = self.block_map[self.file_obj.obj_id]        
             block_map.timestamp = time.time()
-            while current_pos > 0:
-                if self.block_idx == len(self.file_obj.blocks):
-                    break
-                block_size = block_map.block_sizes[self.block_idx]
+            
+        while current_pos > 0:
+            if self.block_idx == len(self.file_obj.blocks):
+                break
+            block_size = block_map.block_sizes[self.block_idx]
+            if current_pos >= block_size:
                 self.block_idx += 1
-                if current_pos >= block_size:
-                    current_pos -= block_size
-                    self.block_offset = block_size
-                else:
-                    self.block_offset = current_pos
-                    current_pos = 0
-                if current_pos == 0:
-                    self.block = block_mgr.load_block(self.file_obj.store_id, self.file_obj.version, self.file_obj.blocks[self.block_idx-1])
+                current_pos -= block_size
+                self.block_offset = 0
+            else:
+                self.block_offset = current_pos
+                current_pos = 0
 
 #===============================================================================
 # SeafileResource
