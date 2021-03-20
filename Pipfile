@@ -29,7 +29,7 @@ wheel = "*"
 
 [packages]
 defusedxml = "~=0.5"
-Jinja2 = "~=2.10"
+Jinja2 = "~=2.11"
 PyYAML = "~=5.1"
 six = "~=1.13"
 json5 = "*"
