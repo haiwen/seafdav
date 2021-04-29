@@ -42,10 +42,10 @@ class SeafDavClient(object):
         # out for convenience
         return [e for e in entries if e.name != path]
 
-    def repo_mkdir(self, repo, parentdir, dirname):
+    def repo_mkdir(self, repo, parentdir, dirname, safe=False):
         repo_name = repo.get('name')
         fullpath = posixpath.join('/', repo_name, parentdir.lstrip('/'), dirname)
-        self._dav.mkdir(fullpath)
+        self._dav.mkdir(fullpath, safe)
 
     def repo_getfile(self, repo, path):
         fobj = io.BytesIO()
