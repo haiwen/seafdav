@@ -9,7 +9,7 @@ if [ ${TRAVIS} ] ;then
     set -x
     CCNET_CONF_DIR="/tmp/seafile-server/tests/conf"
     SEAFILE_CONF_DIR="/tmp/seafile-server/tests/conf/seafile-data"
-    PYTHONPATH="/usr/local/lib/python3.6/site-packages:/tmp/seafobj:${PYTHONPATH}"
+    PYTHONPATH="/usr/local/lib/python3.6/site-packages:/tmp/seafobj:/tmp/seafile-server/tests/conf/seafile-data/:${PYTHONPATH}"
     export PYTHONPATH
     export CCNET_CONF_DIR
     export SEAFILE_CONF_DIR
@@ -17,14 +17,30 @@ if [ ${TRAVIS} ] ;then
 fi
 
 function start_server() {
-    ccnet-server -c /tmp/seafile-server/tests/conf -f - &
     seaf-server -c /tmp/seafile-server/tests/conf -d /tmp/seafile-server/tests/conf/seafile-data -f -l - &
     sleep 2
 }
 
 function init() {
+    cat > /tmp/seafile-server/tests/conf/ccnet.conf << EOF
+[General]
+USER_NAME = server
+ID = 8e4b13b49ca79f35732d9f44a0804940d985627c
+NAME = server
+SERVICE_URL = http://127.0.0.1
+
+[Network]
+PORT = 10002
+
+[Client]
+PORT = 9999
+
+[Database]
+CREATE_TABLES = true
+EOF
     mkdir /tmp/seafile-server/tests/conf/seafile-data
     touch /tmp/seafile-server/tests/conf/seafile-data/seafile.conf
+    touch /tmp/seafile-server/tests/conf/seafile-data/seahub_settings.py
     cat > /tmp/seafile-server/tests/conf/seafile-data/seafile.conf << EOF
 [database]							   
 create_tables = true
