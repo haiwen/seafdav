@@ -13,3 +13,4 @@ gunicorn
 future
 lxml
 sqlalchemy
+pyjson5
