@@ -150,9 +150,6 @@ class SeafileResource(DAVNonCollection):
 
         if self.obj.mtime > 0:
             return self.obj.mtime
-        
-        if self.repo.id is None:
-            return None
 
         # XXX: What about not return last modified for files in v0 repos,
         # since they can be too expensive sometimes?
@@ -192,15 +189,11 @@ class SeafileResource(DAVNonCollection):
                 # When client use "transfer-encode: chunking", the content length
                 # is not included in the request headers
                 if isnewfile:
-                    if self.repo.id is None:
-                        raise DAVError(HTTP_BAD_REQUEST)
                     return seafile_api.check_quota(self.repo.id) >= 0
                 else:
                     return True
             else:
                 delta = contentlength - self.obj.size
-                if self.repo.id is None:
-                        raise DAVError(HTTP_BAD_REQUEST)
                 return seafile_api.check_quota(self.repo.id, delta) >= 0
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
@@ -213,9 +206,6 @@ class SeafileResource(DAVNonCollection):
         assert not self.is_collection
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
-        
-        if self.repo.id is None or self.rel_path is None or self.username is None:
-            raise DAVError(HTTP_BAD_REQUEST)
 
         try:
             if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
@@ -251,9 +241,6 @@ class SeafileResource(DAVNonCollection):
     def handle_delete(self):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
-        
-        if self.repo.id is None or self.rel_path is None or self.username is None:
-            raise DAVError(HTTP_BAD_REQUEST)
 
         try:
             if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
@@ -273,9 +260,6 @@ class SeafileResource(DAVNonCollection):
     def handle_move(self, dest_path):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
-        
-        if self.rel_path is None or self.username is None:
-            raise DAVError(HTTP_BAD_REQUEST)
 
         parts = dest_path.strip("/").split("/", 1)
         if len(parts) <= 1:
@@ -293,8 +277,6 @@ class SeafileResource(DAVNonCollection):
                 raise DAVError(HTTP_FORBIDDEN)
 
             src_dir, src_file = os.path.split(self.rel_path)
-            if not src_file:
-                raise DAVError(HTTP_BAD_REQUEST)
 
             if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
                 raise DAVError(HTTP_BAD_REQUEST)
@@ -314,9 +296,6 @@ class SeafileResource(DAVNonCollection):
     def handle_copy(self, dest_path, depth_infinity):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
-        
-        if self.rel_path is None or self.username is None:
-            raise DAVError(HTTP_BAD_REQUEST)
 
         parts = dest_path.strip("/").split("/", 1)
         if len(parts) <= 1:
@@ -402,8 +381,6 @@ class SeafDirResource(DAVCollection):
         if d.version == 0:
             file_mtimes = []
             try:
-                if self.repo.id is None or self.rel_path is None:
-                    raise DAVError(HTTP_BAD_REQUEST)
                 file_mtimes = seafile_api.get_files_last_modified(self.repo.id, self.rel_path, -1)
             except SearpcError as e:
                 raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
@@ -442,9 +419,6 @@ class SeafDirResource(DAVCollection):
         assert not "/" in name
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
-
-        if self.repo.id is None or self.rel_path is None or self.username is None:
-            raise DAVError(HTTP_BAD_REQUEST)
 
         try:
             if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
@@ -487,9 +461,6 @@ class SeafDirResource(DAVCollection):
         assert not "/" in name
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
-        
-        if self.repo.id is None or self.rel_path is None or self.username is None:
-            raise DAVError(HTTP_BAD_REQUEST)
 
         try:
             if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
@@ -506,9 +477,6 @@ class SeafDirResource(DAVCollection):
     def handle_delete(self):
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
-        
-        if self.repo.id is None or self.rel_path is None or self.username is None:
-            raise DAVError(HTTP_BAD_REQUEST)
 
         try:
             if seafile_api.check_permission_by_path(self.repo.id, self.rel_path, self.username) != "rw":
@@ -842,13 +810,10 @@ def getAccessibleRepos(username, org_id, is_guest):
         if not repo.encrypted:
             all_repos[repo.repo_id] = repo
 
-    if org_id is None or username is None:
-        raise DAVError(HTTP_BAD_REQUEST)
     try:
         owned_repos = get_owned_repos(username, org_id)
     except SearpcError as e:
         util.warn("Failed to list owned repos: %s" % e.msg)
-        raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
     for orepo in owned_repos:
         if orepo:
@@ -861,7 +826,6 @@ def getAccessibleRepos(username, org_id, is_guest):
         shared_repos = get_share_in_repo_list(username, org_id)
     except SearpcError as e:
         util.warn("Failed to list shared repos: %s" % e.msg)
-        raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
     for srepo in shared_repos:
         if srepo:
@@ -872,7 +836,6 @@ def getAccessibleRepos(username, org_id, is_guest):
         repos = get_group_repos(username, org_id)
     except SearpcError as e:
         util.warn("Failed to get groups for %s" % username)
-        raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
     for grepo in repos:
         if grepo: 
             addRepo(grepo)
