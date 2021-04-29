@@ -16,6 +16,11 @@ addons:
     - libonig-dev
     - libfuse-dev
     - net-tools
+    - libglib2.0-dev
+    - sqlite3
+    - libsqlite3-dev
+    - libonig-dev
+    - libcurl4-openssl-dev
 before_install:
   - chmod +x ci/install-deps.sh
   - chmod +x ci/functests.sh
