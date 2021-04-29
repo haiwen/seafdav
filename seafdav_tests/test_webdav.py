@@ -96,6 +96,18 @@ class SeafDAVTestCase(unittest.TestCase):
             entries = davclient.repo_listdir(repo, path)
             self.assertEmpty(entries)
 
+            # delete non existent folder from webapi
+            dirname = 'folder-%s' % randstring()
+            api.del_file(repo.get('id'), parent_dir, dirname, USER)
+            entries = davclient.repo_listdir(repo, parent_dir)
+            self.assertEmpty(entries)
+
+            #delete non existent file from webapi
+            fname = 'uploaded-file-%s.txt' % randstring()
+            api.del_file(repo.get('id'), parent_dir, fname, USER)
+            entries = davclient.repo_listdir(repo, parent_dir)
+            self.assertEmpty(entries)
+
             # create a folder from webapi and list it in webdav
             dirname = 'folder-%s' % randstring()
             api.post_dir(repo.get('id'), parent_dir, dirname, USER)
@@ -104,6 +116,11 @@ class SeafDAVTestCase(unittest.TestCase):
             self.assertHasLen(entries, 1)
             sfolder = entries[0]
             self.assertEqual(dav_basename(sfolder), dirname)
+
+            # create a existent folder from webapi
+            api.post_dir(repo.get('id'), parent_dir, dirname, USER)
+            entries = davclient.repo_listdir(repo, parent_dir)
+            self.assertHasLen(entries, 1)
             
             # create a file from webapi and list it in webdav
             testfpath = os.path.join(os.path.dirname(__file__), 'data', 'test.txt')
@@ -115,6 +132,11 @@ class SeafDAVTestCase(unittest.TestCase):
             self.assertHasLen(entries, 2)
             downloaded_file = davclient.repo_getfile(repo, posixpath.join(parent_dir, fname))
             assert downloaded_file == testfcontent
+
+            # create a existent file from webapi
+            api.post_file(repo.get('id'), testfpath, parent_dir, fname, USER)
+            entries = davclient.repo_listdir(repo, parent_dir)
+            self.assertHasLen(entries, 2)
 
             # create a folder through webdav, and check it in webapi
             dirname = 'another-level1-folder-%s' % randstring(10)
