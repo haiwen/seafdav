@@ -116,11 +116,6 @@ class SeafDAVTestCase(unittest.TestCase):
             self.assertHasLen(entries, 1)
             sfolder = entries[0]
             self.assertEqual(dav_basename(sfolder), dirname)
-
-            # create a existent folder from webapi
-            api.post_dir(repo.get('id'), parent_dir, dirname, USER)
-            entries = davclient.repo_listdir(repo, parent_dir)
-            self.assertHasLen(entries, 1)
             
             # create a file from webapi and list it in webdav
             testfpath = os.path.join(os.path.dirname(__file__), 'data', 'test.txt')
@@ -133,11 +128,6 @@ class SeafDAVTestCase(unittest.TestCase):
             downloaded_file = davclient.repo_getfile(repo, posixpath.join(parent_dir, fname))
             assert downloaded_file == testfcontent
 
-            # create a existent file from webapi
-            api.post_file(repo.get('id'), testfpath, parent_dir, fname, USER)
-            entries = davclient.repo_listdir(repo, parent_dir)
-            self.assertHasLen(entries, 2)
-
             # create a folder through webdav, and check it in webapi
             dirname = 'another-level1-folder-%s' % randstring(10)
             davclient.repo_mkdir(repo, parent_dir, dirname)
@@ -146,8 +136,19 @@ class SeafDAVTestCase(unittest.TestCase):
             davdir = [e for e in entries if e.obj_name == dirname][0]
             self.assertEqual(davdir.obj_name, dirname)
 
+            # create a existent folder through webdav
+            davclient.repo_mkdir(repo, parent_dir, dirname, True)
+            entries = api.list_dir_by_path(repo.get('id'), parent_dir)
+            self.assertHasLen(entries, 3)
+
             # upload a file through webdav, and check it in webapi
             fname = 'uploaded-file-%s' % randstring()
+            repo_fpath = posixpath.join(parent_dir, fname)
+            davclient.repo_uploadfile(repo, testfpath, repo_fpath)
+            entries = api.list_dir_by_path(repo.get('id'), parent_dir)
+            self.assertHasLen(entries, 4)
+
+            # upload a existent file through webdav
             repo_fpath = posixpath.join(parent_dir, fname)
             davclient.repo_uploadfile(repo, testfpath, repo_fpath)
             entries = api.list_dir_by_path(repo.get('id'), parent_dir)
