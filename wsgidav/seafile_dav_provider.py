@@ -226,17 +226,22 @@ class SeafileResource(DAVNonCollection):
                 parent, filename = os.path.split(self.rel_path)
                 contentlength = os.stat(self.tmpfile_path).st_size
                 if not self.check_repo_owner_quota(isnewfile=isnewfile, contentlength=contentlength):
+                    if self.tmpfile_path:
+                        try:
+                            os.unlink(self.tmpfile_path)
+                        finally:
+                            self.tmpfile_path = None
                     raise DAVError(HTTP_FORBIDDEN, "The quota of the repo owner is exceeded")
                 seafile_api.put_file(self.repo.id, self.tmpfile_path, parent, filename,
                                     self.username, None)
         except SearpcError as e:
-            raise DAVError(HTTP_INTERNAL_ERROR)
-
-        if self.tmpfile_path:
-            try:
-                os.unlink(self.tmpfile_path)
-            finally:
-                self.tmpfile_path = None
+            raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
+        finally:
+            if self.tmpfile_path:
+                try:
+                    os.unlink(self.tmpfile_path)
+                finally:
+                    self.tmpfile_path = None
 
     def handle_delete(self):
         if self.provider.readonly:
