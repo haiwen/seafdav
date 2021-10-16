@@ -2,7 +2,7 @@
 
 This is the WebDAV server for seafile.
 
-See [Seafile Server Manual](http://manual.seafile.com/extension/webdav.html) for details.
+See [Seafile Server Manual](http://manual.seafile.com/extension/webdav/) for details.
 
 # Running
 
