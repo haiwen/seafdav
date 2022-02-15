@@ -7,6 +7,7 @@ import wsgidav.util as util
 import os
 import time
 import posixpath
+import unicodedata
 
 import tempfile
 
@@ -738,6 +739,7 @@ class SeafileProvider(DAVProvider):
         return SeafileResource(path, repo, rel_path, obj, environ, self.block_map, self.block_map_lock)
 
 def resolvePath(path, username, org_id, is_guest):
+    path = unicodedata.normalize('NFC', path)
     segments = path.strip("/").split("/")
     if len(segments) == 0:
         raise DAVError(HTTP_BAD_REQUEST)
@@ -767,6 +769,7 @@ def resolvePath(path, username, org_id, is_guest):
     return (repo, rel_path, obj)
 
 def resolveRepoPath(repo, path):
+    path = unicodedata.normalize('NFC', path)
     segments = path.strip("/").split("/")
 
     obj = get_repo_root_seafdir(repo)

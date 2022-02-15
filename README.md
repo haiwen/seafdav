@@ -6,10 +6,8 @@ See [Seafile Server Manual](http://manual.seafile.com/extension/webdav.html) for
 
 # Running
 
-There are two templates for running seafdav:
+There are a template for running seafdav:
 - run.sh.template: This is for running seafdav on the default 8080 port with a built-in CherryPy server.
-- run-fcgi.sh.template and seafdav.conf.template:
-  These two files are for running seafdav on fastcgi mode.
 
 To run on 8080 port:
 
@@ -24,10 +22,10 @@ Then change CCNET_CONF_DIR and SEAFILE_CONF_DIR to your Seafile server's setting
 - start local seafile server
 - start local seahub server (While seafdav itself doesn't require seahub, we use seahub webapi as a driver for testing)
 - start seafdav server
-- create a test user `test@seafiltest.com` with password `test`
+- create a test user `test@seafiletest.com` with password `test`
 - Run the tests
 ```
 export CCNET_CONF_DIR=/path/to/ccnet
 export SEAFILE_CONF_DIR=/path/to/seafile-data
-./functest.sh test
+./ci/functest.sh test
 ```
