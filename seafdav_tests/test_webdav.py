@@ -98,13 +98,13 @@ class SeafDAVTestCase(unittest.TestCase):
 
             # delete non existent folder from webapi
             dirname = 'folder-%s' % randstring()
-            api.del_file(repo.get('id'), parent_dir, dirname, USER)
+            api.del_file(repo.get('id'), parent_dir, '[\"'+dirname+'\"]', USER)
             entries = davclient.repo_listdir(repo, parent_dir)
             self.assertEmpty(entries)
 
             #delete non existent file from webapi
             fname = 'uploaded-file-%s.txt' % randstring()
-            api.del_file(repo.get('id'), parent_dir, fname, USER)
+            api.del_file(repo.get('id'), parent_dir, '[\"'+fname+'\"]', USER)
             entries = davclient.repo_listdir(repo, parent_dir)
             self.assertEmpty(entries)
 
