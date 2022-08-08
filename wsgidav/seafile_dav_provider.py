@@ -257,7 +257,7 @@ class SeafileResource(DAVNonCollection):
                 return True
 
             parent, filename = os.path.split(self.rel_path)
-            seafile_api.del_file(self.repo.id, parent, filename, self.username)
+            seafile_api.del_file(self.repo.id, parent, '[\"'+filename+'\"]', self.username)
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
@@ -290,10 +290,10 @@ class SeafileResource(DAVNonCollection):
             # some clients such as GoodReader requires "overwrite" semantics
             file_id_dest = seafile_api.get_file_id_by_path(dest_repo.id, rel_path)
             if file_id_dest != None:
-                seafile_api.del_file(dest_repo.id, dest_dir, dest_file, self.username)
+                seafile_api.del_file(dest_repo.id, dest_dir, '[\"'+dest_file+'\"]', self.username)
 
-            seafile_api.move_file(self.repo.id, src_dir, src_file,
-                                dest_repo.id, dest_dir, dest_file, 1, self.username, NEED_PROGRESS, SYNCHRONOUS)
+            seafile_api.move_file(self.repo.id, src_dir, '[\"'+src_file+'\"]',
+                                dest_repo.id, dest_dir, '[\"'+dest_file+'\"]', 1, self.username, NEED_PROGRESS, SYNCHRONOUS)
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
@@ -325,8 +325,8 @@ class SeafileResource(DAVNonCollection):
             if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
                 raise DAVError(HTTP_BAD_REQUEST)
 
-            seafile_api.copy_file(self.repo.id, src_dir, src_file,
-                                dest_repo.id, dest_dir, dest_file, self.username, NEED_PROGRESS, SYNCHRONOUS)
+            seafile_api.copy_file(self.repo.id, src_dir, '[\"'+src_file+'\"]',
+                                dest_repo.id, dest_dir, '[\"'+dest_file+'\"]', self.username, NEED_PROGRESS, SYNCHRONOUS)
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
@@ -493,7 +493,7 @@ class SeafDirResource(DAVCollection):
             if not filename:
                 raise DAVError(HTTP_BAD_REQUEST)
 
-            seafile_api.del_file(self.repo.id, parent, filename, self.username)
+            seafile_api.del_file(self.repo.id, parent, '[\"'+filename+'\"]', self.username)
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
@@ -526,8 +526,8 @@ class SeafDirResource(DAVCollection):
             if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
                 raise DAVError(HTTP_BAD_REQUEST)
 
-            seafile_api.move_file(self.repo.id, src_dir, src_file,
-                                dest_repo.id, dest_dir, dest_file, 0, self.username, NEED_PROGRESS, SYNCHRONOUS)
+            seafile_api.move_file(self.repo.id, src_dir, '[\"'+src_file+'\"]',
+                                dest_repo.id, dest_dir, '[\"'+dest_file+'\"]', 0, self.username, NEED_PROGRESS, SYNCHRONOUS)
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
@@ -560,8 +560,8 @@ class SeafDirResource(DAVCollection):
             if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
                 raise DAVError(HTTP_BAD_REQUEST)
 
-            seafile_api.copy_file(self.repo.id, src_dir, src_file,
-                                dest_repo.id, dest_dir, dest_file, self.username, NEED_PROGRESS, SYNCHRONOUS)
+            seafile_api.copy_file(self.repo.id, src_dir, '[\"'+src_file+'\"]',
+                                dest_repo.id, dest_dir, '[\"'+dest_file+'\"]', self.username, NEED_PROGRESS, SYNCHRONOUS)
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
