@@ -1,5 +1,6 @@
 import os
 import posixpath
+import hashlib
 import seahub_settings
 from seaserv import ccnet_api as api
 from pysearpc import SearpcError
@@ -134,7 +135,7 @@ def validateSecret(session, password, ccnet_email):
     cipher = AES.new(secret.encode('utf8'), AES.MODE_ECB)
     encoded_str = 'aes$' + EncodeAES(cipher, password.encode('utf8')).decode('utf8')
     options_useroptions = seahub_db.Base.classes.options_useroptions
-    q = session.query(options_useroptions.email)
+    q = session.query(options_useroptions.option_val)
     q = q.filter(options_useroptions.email==ccnet_email,
                     options_useroptions.option_key=='webdav_secret')
     res = q.first()
