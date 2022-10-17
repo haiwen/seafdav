@@ -136,8 +136,7 @@ def validateSecret(session, password, ccnet_email):
     options_useroptions = seahub_db.Base.classes.options_useroptions
     q = session.query(options_useroptions.email)
     q = q.filter(options_useroptions.email==ccnet_email,
-                    options_useroptions.option_key=='webdav_secret',
-                    options_useroptions.option_val==encoded_str)
+                    options_useroptions.option_key=='webdav_secret')
     res = q.first()
     if not res:
         return False
