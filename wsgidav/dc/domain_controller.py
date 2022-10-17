@@ -1,5 +1,6 @@
 import os
 import posixpath
+import hashlib
 import seahub_settings
 from seaserv import ccnet_api as api
 from pysearpc import SearpcError
@@ -134,13 +135,39 @@ def validateSecret(session, password, ccnet_email):
     cipher = AES.new(secret.encode('utf8'), AES.MODE_ECB)
     encoded_str = 'aes$' + EncodeAES(cipher, password.encode('utf8')).decode('utf8')
     options_useroptions = seahub_db.Base.classes.options_useroptions
-    q = session.query(options_useroptions.email)
+    q = session.query(options_useroptions.option_val)
     q = q.filter(options_useroptions.email==ccnet_email,
-                    options_useroptions.option_val==encoded_str)
+                    options_useroptions.option_key=='webdav_secret')
     res = q.first()
     if not res:
         return False
-    return True
+
+    hashed_password = res[0]
+    # use aes algorithm
+    if hashed_password.startswith('aes$'):
+        if encoded_str == hashed_password:
+            return True
+        return False
+
+    # use sha1 algorithm
+    strs = hashed_password.split('$')
+    if len(strs) != 3:
+        return False
+
+    # sha1$QRle$5511a4e2efb7d12e1f64647f64c0c6e105d150ff
+    algorithm, salt, hex_hash = strs
+
+    return hashed_password == hash_password(password, salt, algorithm)
+
+def hash_password(password, salt, algorithm='sha1'):
+    digest = hashlib.pbkdf2_hmac(algorithm,
+                                 password.encode(),
+                                 salt.encode(),
+                                 10000)
+    hex_hash = digest.hex()
+
+    # sha1$QRle$5511a4e2efb7d12e1f64647f64c0c6e105d150ff
+    return "{}${}${}".format(algorithm, salt, hex_hash)
 
 def enableTwoFactorAuth(session, email):
     enable_settings_via_web = True
