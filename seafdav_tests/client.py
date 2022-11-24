@@ -6,7 +6,7 @@ import io
 import posixpath
 from seaserv import seafile_api
 
-USER = os.environ.get('SEAFILE_TEST_USERNAME', 'test@seafiletest.com')
+USER = os.environ.get('SEAFILE_TEST_USERNAME', 'test@example.com')
 PASSWORD = os.environ.get('SEAFILE_TEST_PASSWORD', 'test')
 
 def get_webapi_client():
