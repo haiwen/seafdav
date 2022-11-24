@@ -2,27 +2,27 @@
 
 This is the WebDAV server for seafile.
 
-See [Seafile Server Manual](http://manual.seafile.com/extension/webdav.html) for details.
+See [Seafile Server Manual](http://manual.seafile.com/extension/webdav/) for details.
 
 # Running
 
-There are a template for running seafdav:
-- run.sh.template: This is for running seafdav on the default 8080 port with a built-in CherryPy server.
+There is a template for running seafdav:
+- run.sh.template: This is for running seafdav on the default port 8080 with a built-in CherryPy server.
 
-To run on 8080 port:
+To run on port 8080:
 
 ```
 cp run.sh.template run.sh
 ```
 
-Then change CCNET_CONF_DIR and SEAFILE_CONF_DIR to your Seafile server's settings.
+Then change CCNET_CONF_DIR and SEAFILE_CONF_DIR to your Seafile server settings.
 
 # Testing
 
 - start local seafile server
-- start local seahub server (While seafdav itself doesn't require seahub, we use seahub webapi as a driver for testing)
+- start local seahub server (while seafdav itself doesn't require seahub, we use seahub webapi as a driver for testing)
 - start seafdav server
-- create a test user `test@seafiletest.com` with password `test`
+- create a test user `test@example.com` with password `test`
 - Run the tests
 ```
 export CCNET_CONF_DIR=/path/to/ccnet
