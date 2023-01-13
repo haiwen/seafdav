@@ -50,7 +50,7 @@ EOF
 /tmp/seafile-server/tests/conf/seafile-data
 EOF
     start_server
-    python -c "from seaserv import ccnet_api as api;api.add_emailuser('test@seafiletest.com','test',0,1)"    
+    python -c "from seaserv import ccnet_api as api;api.add_emailuser('test@example.com','test',0,1)"    
 }
 
 function start_seafdav() {
