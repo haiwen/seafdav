@@ -31,12 +31,27 @@ def create_seahub_db_engine():
     #import local_settings
     #db_infos = local_settings.DATABASES['default']
 
-    if db_infos.get('ENGINE') != 'django.db.backends.mysql':
-        _logger.warning('Failed to init seahub db, only mysql db supported.')
+    if db_infos.get('ENGINE') == 'django.db.backends.mysql':
+        db_type = "mysql"
+        pass
+    elif db_infos.get('ENGINE') == 'django.db.backends.postgresql_psycopg2':
+        db_type = "pgsql"
+        pass
+    elif db_infos.get('ENGINE') == 'django.db.backends.postgresql':
+        db_type = "pgsql"
+        pass
+    else:
+        _logger.warning('Failed to init seahub db, only mysql and postgres db supported.')
         return
-    
+
     db_host = db_infos.get('HOST', '127.0.0.1')
-    db_port = int(db_infos.get('PORT', '3306'))
+    if db_type == "mysql":
+        db_port = int(db_infos.get('PORT', '3306'))
+    elif db_type == "pgsql":
+        db_port = int(db_infos.get('PORT', '3306'))
+    else:
+        _logger.warning('Failed to init seahub db, only mysql and postgres db supported.')
+        return
     db_name = db_infos.get('NAME')
     if not db_name:
         _logger.warning ('Failed to init seahub db, db name is not set.')
@@ -47,7 +62,13 @@ def create_seahub_db_engine():
         return
     db_passwd = db_infos.get('PASSWORD')
 
-    db_url = "mysql+pymysql://%s:%s@%s:%s/%s?charset=utf8" % (db_user, quote_plus(db_passwd), db_host, db_port, db_name)
+    if db_type == "mysql":
+        db_url = "mysql+pymysql://%s:%s@%s:%s/%s?charset=utf8" % (db_user, quote_plus(db_passwd), db_host, db_port, db_name)
+    elif db_type == "pgsql":
+        db_url = "postgresql://%s:%s@%s:%s/%s" % (db_user, quote_plus(db_passwd), db_host, db_port, db_name)
+    else:
+        _logger.warning('Failed to init seahub db, only mysql and postgres db supported.')
+        return
 
     # Add pool recycle, or mysql connection will be closed by mysqld if idle
     # for too long.
