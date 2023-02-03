@@ -303,6 +303,12 @@ class HTTPAuthenticator(BaseMiddleware):
         auth_value = util.to_str(auth_value)
         user_name, password = auth_value.split(":", 1)
 
+        # for OCM validate http auth header
+        if not self.domain_controller.basic_auth_user(realm, user_name, password, environ):
+            auth_value = base64.decodebytes(util.to_bytes(user_name))
+            auth_value = util.to_str(auth_value)
+            user_name, password = auth_value.split(":", 1)
+
         if self.domain_controller.basic_auth_user(realm, user_name, password, environ):
             environ["wsgidav.auth.realm"] = realm
             environ["wsgidav.auth.user_name"] = user_name
