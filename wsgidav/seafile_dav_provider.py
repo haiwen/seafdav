@@ -6,6 +6,7 @@ from threading import Timer, Lock
 import wsgidav.util as util
 import os
 import time
+import base64
 import posixpath
 import unicodedata
 
@@ -83,7 +84,7 @@ class SeafileStream(object):
         self.block_offset = 0
 
         current_pos = pos
-        if current_pos == 0: 
+        if current_pos == 0:
             return
 
         with self.block_map_lock:
@@ -93,9 +94,9 @@ class SeafileStream(object):
                     block_size = block_mgr.stat_block(self.file_obj.store_id, self.file_obj.version, self.file_obj.blocks[i])
                     block_map.block_sizes.append(block_size)
                 self.block_map[self.file_obj.obj_id] = block_map
-            block_map = self.block_map[self.file_obj.obj_id]        
+            block_map = self.block_map[self.file_obj.obj_id]
             block_map.timestamp = time.time()
-            
+
         while current_pos > 0:
             if self.block_idx == len(self.file_obj.blocks):
                 break
@@ -168,7 +169,7 @@ class SeafileResource(DAVNonCollection):
     def support_etag(self):
         return True
     def support_ranges(self):
-        return True 
+        return True
 
     def get_content(self):
         """Open content as a stream for reading.
@@ -706,6 +707,8 @@ class SeafileProvider(DAVProvider):
 
 
     def get_resource_inst(self, path, environ):
+
+        _logger.error(environ)
         """Return info dictionary for path.
 
         See DAVProvider.getResourceInst()
@@ -723,10 +726,23 @@ class SeafileProvider(DAVProvider):
         org_id = environ.get("seafile.org_id", "")
         is_guest = environ.get("seafile.is_guest", False)
 
+
+        _logger.error(1)
+        _logger.error(path)
+
+        if environ.get("ocm_webdav_parent_path"):
+            _logger.error("has ocm_webdav_parent_path")
+            ocm_webdav_parent_path = environ.get("ocm_webdav_parent_path")
+            path = posixpath.join(ocm_webdav_parent_path, path.strip('/'))
+
+        _logger.error(2)
+        _logger.error(path)
+
         if path == "/" or path == "":
             return RootResource(username, environ, self.show_repo_id)
 
         path = path.rstrip("/")
+
         try:
             repo, rel_path, obj = resolvePath(path, username, org_id, is_guest)
         except DAVError as e:
@@ -735,10 +751,15 @@ class SeafileProvider(DAVProvider):
             raise
 
         if isinstance(obj, SeafDir):
+
             return SeafDirResource(path, repo, rel_path, obj, environ)
-        return SeafileResource(path, repo, rel_path, obj, environ, self.block_map, self.block_map_lock)
+
+        return SeafileResource(path, repo, rel_path, obj,
+                               environ, self.block_map, self.block_map_lock)
+
 
 def resolvePath(path, username, org_id, is_guest):
+    _logger.error('in resolvePath')
     path = unicodedata.normalize('NFC', path)
     segments = path.strip("/").split("/")
     if len(segments) == 0:
@@ -769,6 +790,7 @@ def resolvePath(path, username, org_id, is_guest):
     return (repo, rel_path, obj)
 
 def resolveRepoPath(repo, path):
+    _logger.error('in resolveRepoPath')
     path = unicodedata.normalize('NFC', path)
     segments = path.strip("/").split("/")
 
@@ -845,7 +867,7 @@ def getAccessibleRepos(username, org_id, is_guest):
     except SearpcError as e:
         util.warn("Failed to get groups for %s" % username)
     for grepo in repos:
-        if grepo: 
+        if grepo:
             addRepo(grepo)
 
     for prepo in list_inner_pub_repos(username, org_id, is_guest):

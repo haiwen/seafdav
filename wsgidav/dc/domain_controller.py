@@ -7,6 +7,9 @@ from wsgidav.dc import seahub_db
 import wsgidav.util as util
 from wsgidav.dc.base_dc import BaseDomainController
 from sqlalchemy.sql import exists
+
+from seaserv import seafile_api
+
 # basic_auth_user, get_domain_realm, require_authentication
 _logger = util.get_module_logger(__name__)
 
@@ -94,7 +97,8 @@ class SeafileDomainController(BaseDomainController):
                     return False
             else:
                 if not validateSecret(session, password, ccnet_email) and \
-                        api.validate_emailuser(ccnet_email, password) != 0:
+                        api.validate_emailuser(ccnet_email, password) != 0 and \
+                        not OCMValidateHttpAuthHeader(session, environ):
                     return False
 
             username = ccnet_email
@@ -173,6 +177,33 @@ def hash_password(password, salt, algorithm='sha1'):
 
     # sha1$QRle$5511a4e2efb7d12e1f64647f64c0c6e105d150ff
     return "{}${}${}".format(algorithm, salt, hex_hash)
+
+
+def OCMValidateHttpAuthHeader(session, environ):
+
+    if not session:
+        return False
+
+    auth_header = environ["HTTP_AUTHORIZATION"]
+    auth_value = auth_header[len("Basic ") :].strip()
+
+    auth_value = base64.decodebytes(util.to_bytes(auth_value))
+    auth_value = util.to_str(auth_value)
+    shared_secret, _ = auth_value.split(":", 1)
+
+    ocm_via_webdav_shares = seahub_db.Base.classes.ocm_via_webdav_shares
+    q = session.query(ocm_via_webdav_shares.repo_id) \
+               .filter(ocm_via_webdav_shares.shared_secret == shared_secret)
+
+    res = q.first()
+    if not res:
+        _logger.warning('OCM validate http auth header failed: {}'.format(auth_header))
+        return False
+
+    repo_id = res[0]
+    repo = seafile_api.get_repo(repo_id)
+    environ["ocm_webdav_parent_path"] = '/' + repo.repo_name
+    return True
 
 
 def enableTwoFactorAuth(session, email):
