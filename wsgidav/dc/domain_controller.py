@@ -197,7 +197,7 @@ def OCMValidateHttpAuthHeader(session, environ):
 
     res = q.first()
     if not res:
-        _logger.warning('OCM validate http auth header failed: {}'.format(auth_header))
+        _logger.info('OCM validate http auth header failed: {}'.format(auth_header))
         return False
 
     repo_id = res[0]
