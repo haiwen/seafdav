@@ -517,16 +517,6 @@ class GunicornApplication(gunicorn.app.base.BaseApplication):
     def load(self):
         return self.application
 
-def _run_gunicorn(app, config, mode):
-    options = {
-        'bind': '%s:%s' % (config.get('host'), config.get('port')),
-        'threads': config.get('workers'),
-        "pidfile": config.get('pidfile'),
-        "timeout": config.get('timeout')
-    }
-
-    GunicornApplication(app, options).run()
-
 
 def _run_cheroot(app, config, _server):
     """Run WsgiDAV using cheroot.server (https://cheroot.cherrypy.dev/)."""
@@ -737,8 +727,9 @@ def _run_gunicorn(app, config, server):
     # See https://docs.gunicorn.org/en/latest/settings.html
     server_args = {
         "bind": "{}:{}".format(config["host"], config["port"]),
-        "threads": 50,
-        "timeout": 1200,
+        'threads': config.get('workers'),
+        "timeout": config.get('timeout'),
+        "pidfile": config.get('pidfile'),
     }
     if info["use_ssl"]:
         server_args.update(
@@ -881,9 +872,6 @@ def _run_wsgiref(app, config, _server):
 
 
 SUPPORTED_SERVERS = {
-    "gunicorn": _run_gunicorn,
-    "paste": _run_paste,
-    "gevent": _run_gevent,
     "cheroot": _run_cheroot,
     # "cherrypy": _run__cherrypy,
     "ext-wsgiutils": _run_ext_wsgiutils,
