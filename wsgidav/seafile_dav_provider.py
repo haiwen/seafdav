@@ -1,5 +1,7 @@
 from wsgidav.dav_error import DAVError, HTTP_BAD_REQUEST, HTTP_FORBIDDEN, \
-    HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR
+from wsgidav.dav_error import DAVError, HTTP_BAD_REQUEST, HTTP_FORBIDDEN, \
+    HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR, HTTP_TOO_MANY_FILES_IN_LIBRARY
+
 from wsgidav.dav_provider import DAVProvider, DAVCollection, DAVNonCollection
 from threading import Timer, Lock
 
@@ -437,9 +439,11 @@ class SeafDirResource(DAVCollection):
 
         try:
             seafile_api.post_empty_file(self.repo.id, self.rel_path, name, self.username)
-        except SearpcError as e:
+        except Exception as e:
             if e.msg == 'Invalid file name':
                 raise DAVError(HTTP_BAD_REQUEST, e.msg)
+            if e.msg == 'Too many files in library.':
+                raise DAVError(HTTP_TOO_MANY_FILES_IN_LIBRARY, e.msg)
             if e.msg != 'file already exists':
                 raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
