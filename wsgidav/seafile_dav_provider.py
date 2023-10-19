@@ -1,5 +1,4 @@
 from wsgidav.dav_error import DAVError, HTTP_BAD_REQUEST, HTTP_FORBIDDEN, \
-from wsgidav.dav_error import DAVError, HTTP_BAD_REQUEST, HTTP_FORBIDDEN, \
     HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR, HTTP_TOO_MANY_FILES_IN_LIBRARY
 
 from wsgidav.dav_provider import DAVProvider, DAVCollection, DAVNonCollection
