@@ -117,6 +117,7 @@ class SeafileResource(DAVNonCollection):
         super(SeafileResource, self).__init__(path, environ)
         self.repo = repo
         self.rel_path = rel_path
+        self._file_path: str = rel_path
         self.obj = obj
         self.username = environ.get("http_authenticator.username", "")
         self.org_id = environ.get("seafile.org_id", "")
@@ -144,6 +145,9 @@ class SeafileResource(DAVNonCollection):
         return self.name
     def get_etag(self):
         return self.obj.obj_id
+
+    def is_link(self):
+        return os.path.islink(self._file_path)
 
     def get_last_modified(self):
         cached_mtime = getattr(self.obj, 'last_modified', None)
@@ -341,6 +345,7 @@ class SeafDirResource(DAVCollection):
         super(SeafDirResource, self).__init__(path, environ)
         self.repo = repo
         self.rel_path = rel_path
+        self._file_path: str = rel_path
         self.obj = obj
         self.username = environ.get("http_authenticator.username", "")
         self.org_id = environ.get("seafile.org_id", "")
@@ -359,6 +364,9 @@ class SeafDirResource(DAVCollection):
     def get_last_modified(self):
 #        return int(time.time())
         return None
+
+    def is_link(self):
+        return os.path.islink(self._file_path)
 
     def get_member_names(self):
         namelist = []
