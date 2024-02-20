@@ -34,7 +34,7 @@ def create_seahub_db_engine():
     if db_infos.get('ENGINE') != 'django.db.backends.mysql':
         _logger.warning('Failed to init seahub db, only mysql db supported.')
         return
-    
+
     db_host = db_infos.get('HOST', '127.0.0.1')
     db_port = int(db_infos.get('PORT', '3306'))
     db_name = db_infos.get('NAME')
@@ -47,7 +47,12 @@ def create_seahub_db_engine():
         return
     db_passwd = db_infos.get('PASSWORD')
 
-    db_url = "mysql+pymysql://%s:%s@%s:%s/%s?charset=utf8" % (db_user, quote_plus(db_passwd), db_host, db_port, db_name)
+    if db_passwd and not db_host.startswith('/'):
+        db_url = f"mysql+pymysql://{db_user}:{quote_plus(db_passwd)}@{db_host}:{db_port}/{db_name}?charset=utf8"
+
+    if not db_passwd and db_host.startswith('/'):
+        db_url = f"mysql+pymysql://{db_user}:@localhost:{db_port}/{db_name}?unix_socket={db_host}&charset=utf8"
+
 
     # Add pool recycle, or mysql connection will be closed by mysqld if idle
     # for too long.
