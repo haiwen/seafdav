@@ -3,6 +3,7 @@ import base64
 import seahub_settings
 from seaserv import ccnet_api as api
 from wsgidav.dc.seaf_utils import multi_tenancy_enabled
+from wsgidav.dc.seaf_utils import CustomLDAPBackend
 from wsgidav.dc import seahub_db
 import wsgidav.util as util
 from wsgidav.dc.base_dc import BaseDomainController
@@ -70,6 +71,13 @@ class SeafileDomainController(BaseDomainController):
                     res = q.first()
                     if res:
                         ccnet_email = res[0]
+                    else:
+                        social_auth = seahub_db.Base.classes.social_auth_usersocialauth
+                        q = session.query(social_auth.username) \
+                                   .filter(social_auth.uid == username) \
+                                   .filter(social_auth.provider == getattr(seahub_settings, 'LDAP_PROVIDER', 'ldap'))
+                        res = q.first()
+                        ccnet_email = res[0] if res else username
 
             if not ccnet_email:
                 _logger.warning('User %s doesn\'t exist', username)
@@ -83,19 +91,23 @@ class SeafileDomainController(BaseDomainController):
             if session and enableTwoFactorAuth(session, ccnet_email):
                 enable_two_factor_auth = True
 
-            if not enable_webdav_secret and enable_two_factor_auth:
-                _logger.warning("Two factor auth is enabled, no access to webdav.")
-                return False
-            elif enable_webdav_secret and enable_two_factor_auth:
-                if not validateSecret(session, password, ccnet_email):
+            if enable_two_factor_auth:
+                if not enable_webdav_secret:
+                    _logger.warning("Two factor auth is enabled, no access to webdav.")
                     return False
-            elif not enable_webdav_secret and not enable_two_factor_auth:
-                if api.validate_emailuser(ccnet_email, password) != 0:
-                    return False
+                else:
+                    if not validate_secret(session, ccnet_email, password):
+                        return False
             else:
-                if not validateSecret(session, password, ccnet_email) and \
-                        api.validate_emailuser(ccnet_email, password) != 0:
-                    return False
+                if not enable_webdav_secret:
+                    if api.validate_emailuser(ccnet_email, password) != 0 and \
+                            not validate_ldap_password(username, password):
+                        return False
+                else:
+                    if api.validate_emailuser(ccnet_email, password) != 0 and \
+                            not validate_secret(session, ccnet_email, password) and \
+                            not validate_ldap_password(username, password):
+                        return False
 
             username = ccnet_email
         except Exception as e:
@@ -128,7 +140,13 @@ class SeafileDomainController(BaseDomainController):
         return True
 
 
-def validateSecret(session, password, ccnet_email):
+def validate_ldap_password(username, password):
+
+    ldap_auth_backend = CustomLDAPBackend()
+    return ldap_auth_backend.authenticate(username, password)
+
+
+def validate_secret(session, ccnet_email, password):
 
     if not session:
         return False

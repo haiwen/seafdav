@@ -77,7 +77,7 @@ def ping_connection(dbapi_connection, connection_record, connection_proxy): # py
         cursor.execute("SELECT 1")
         cursor.close()
     except:
-        logger.info('fail to ping database server, disposing all cached connections')
+        _logger.info('fail to ping database server, disposing all cached connections')
         connection_proxy._pool.dispose() # pylint: disable=protected-access
 
         # Raise DisconnectionError so the pool would create a new connection
