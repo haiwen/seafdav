@@ -362,8 +362,14 @@ class SeafDirResource(DAVCollection):
     def get_etag(self):
         return self.obj.obj_id
     def get_last_modified(self):
-#        return int(time.time())
-        return None
+        if not self.rel_path:
+            # is repo
+            return self.repo.last_modified
+        else:
+            # is folder
+            dir_obj = seafile_api.get_dirent_by_path(self.repo.id,
+                                                     self.rel_path)
+            return dir_obj.mtime
 
     def is_link(self):
         return os.path.islink(self._file_path)
