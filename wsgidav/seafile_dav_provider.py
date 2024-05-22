@@ -12,7 +12,7 @@ import unicodedata
 
 import tempfile
 
-from seaserv import seafile_api, CALC_SHARE_USAGE
+from seaserv import seafile_api
 from pysearpc import SearpcError
 from seafobj import commit_mgr, fs_mgr
 from seafobj.fs import SeafFile, SeafDir
@@ -28,13 +28,16 @@ SYNCHRONOUS = 1
 
 INFINITE_QUOTA = -2
 
+
 def sort_repo_list(repos):
-    return sorted(repos, key = lambda r: r.id)
+    return sorted(repos, key=lambda r: r.id)
+
 
 class BlockMap(object):
     def __init__(self):
         self.block_sizes = []
         self.timestamp = time.time()
+
 
 class SeafileStream(object):
     '''Implements basic file-like interface'''
@@ -66,7 +69,7 @@ class SeafileStream(object):
                 self.block = None
                 self.block_offset = 0
             else:
-                ret += self.block[self.block_offset:self.block_offset+remain]
+                ret += self.block[self.block_offset:self.block_offset + remain]
                 self.block_offset += remain
                 remain = 0
 
@@ -84,7 +87,7 @@ class SeafileStream(object):
         self.block_offset = 0
 
         current_pos = pos
-        if current_pos == 0: 
+        if current_pos == 0:
             return
 
         with self.block_map_lock:
@@ -94,9 +97,9 @@ class SeafileStream(object):
                     block_size = block_mgr.stat_block(self.file_obj.store_id, self.file_obj.version, self.file_obj.blocks[i])
                     block_map.block_sizes.append(block_size)
                 self.block_map[self.file_obj.obj_id] = block_map
-            block_map = self.block_map[self.file_obj.obj_id]        
+            block_map = self.block_map[self.file_obj.obj_id]
             block_map.timestamp = time.time()
-            
+
         while current_pos > 0:
             if self.block_idx == len(self.file_obj.blocks):
                 break
@@ -109,10 +112,9 @@ class SeafileStream(object):
                 self.block_offset = current_pos
                 current_pos = 0
 
-#===============================================================================
-# SeafileResource
-#===============================================================================
+
 class SeafileResource(DAVNonCollection):
+
     def __init__(self, path, repo, rel_path, obj, environ, block_map={}, block_map_lock=None):
         super(SeafileResource, self).__init__(path, environ)
         self.repo = repo
@@ -130,19 +132,24 @@ class SeafileResource(DAVNonCollection):
     # Getter methods for standard live properties
     def get_content_length(self):
         return self.obj.size
+
     def get_content_type(self):
-#        (mimetype, _mimeencoding) = mimetypes.guess_type(self.path)
-#        print "mimetype(%s): %r, %r" % (self.path, mimetype, _mimeencoding)
-#        if not mimetype:
-#            mimetype = "application/octet-stream"
-#        print "mimetype(%s): return %r" % (self.path, mimetype)
-#        return mimetype
+        # (mimetype, _mimeencoding) = mimetypes.guess_type(self.path)
+        # print "mimetype(%s): %r, %r" % (self.path, mimetype, _mimeencoding)
+        # if not mimetype:
+        #     mimetype = "application/octet-stream"
+        # print "mimetype(%s): return %r" % (self.path, mimetype)
+        # return mimetype
         return util.guess_mime_type(self.path)
+
     def get_creation_date(self):
-#        return int(time.time())
+        # return int(time.time())
+
         return None
+
     def get_display_name(self):
         return self.name
+
     def get_etag(self):
         return self.obj.obj_id
 
@@ -172,8 +179,9 @@ class SeafileResource(DAVNonCollection):
 
     def support_etag(self):
         return True
+
     def support_ranges(self):
-        return True 
+        return True
 
     def get_content(self):
         """Open content as a stream for reading.
@@ -239,7 +247,7 @@ class SeafileResource(DAVNonCollection):
                             self.tmpfile_path = None
                     raise DAVError(HTTP_FORBIDDEN, "The quota of the repo owner is exceeded")
                 seafile_api.put_file(self.repo.id, self.tmpfile_path, parent, filename,
-                                    self.username, None)
+                                     self.username, None)
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
         finally:
@@ -262,7 +270,7 @@ class SeafileResource(DAVNonCollection):
                 return True
 
             parent, filename = os.path.split(self.rel_path)
-            seafile_api.del_file(self.repo.id, parent, '[\"'+filename+'\"]', self.username)
+            seafile_api.del_file(self.repo.id, parent, '[\"' + filename + '\"]', self.username)
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
@@ -294,11 +302,13 @@ class SeafileResource(DAVNonCollection):
 
             # some clients such as GoodReader requires "overwrite" semantics
             file_id_dest = seafile_api.get_file_id_by_path(dest_repo.id, rel_path)
-            if file_id_dest != None:
-                seafile_api.del_file(dest_repo.id, dest_dir, '[\"'+dest_file+'\"]', self.username)
+            if file_id_dest is not None:
+                seafile_api.del_file(dest_repo.id, dest_dir, '[\"' + dest_file + '\"]',
+                                     self.username)
 
-            seafile_api.move_file(self.repo.id, src_dir, '[\"'+src_file+'\"]',
-                                dest_repo.id, dest_dir, '[\"'+dest_file+'\"]', 1, self.username, NEED_PROGRESS, SYNCHRONOUS)
+            seafile_api.move_file(self.repo.id, src_dir, '[\"' + src_file + '\"]',
+                                  dest_repo.id, dest_dir, '[\"' + dest_file + '\"]',
+                                  1, self.username, NEED_PROGRESS, SYNCHRONOUS)
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
@@ -330,17 +340,17 @@ class SeafileResource(DAVNonCollection):
             if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
                 raise DAVError(HTTP_BAD_REQUEST)
 
-            seafile_api.copy_file(self.repo.id, src_dir, '[\"'+src_file+'\"]',
-                                dest_repo.id, dest_dir, '[\"'+dest_file+'\"]', self.username, NEED_PROGRESS, SYNCHRONOUS)
+            seafile_api.copy_file(self.repo.id, src_dir, '[\"' + src_file + '\"]',
+                                  dest_repo.id, dest_dir, '[\"' + dest_file + '\"]',
+                                  self.username, NEED_PROGRESS, SYNCHRONOUS)
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
         return True
 
-#===============================================================================
-# SeafDirResource
-#===============================================================================
+
 class SeafDirResource(DAVCollection):
+
     def __init__(self, path, repo, rel_path, obj, environ):
         super(SeafDirResource, self).__init__(path, environ)
         self.repo = repo
@@ -353,17 +363,27 @@ class SeafDirResource(DAVCollection):
 
     # Getter methods for standard live properties
     def get_creation_date(self):
-#        return int(time.time())
+        # return int(time.time())
         return None
+
     def get_display_name(self):
         return self.name
+
     def get_directory_info(self):
         return None
+
     def get_etag(self):
         return self.obj.obj_id
+
     def get_last_modified(self):
-#        return int(time.time())
-        return None
+        if not self.rel_path:
+            # is repo
+            return self.repo.last_modified
+        else:
+            # is folder
+            dir_obj = seafile_api.get_dirent_by_path(self.repo.id,
+                                                     self.rel_path)
+            return dir_obj.mtime
 
     def is_link(self):
         return os.path.islink(self._file_path)
@@ -385,9 +405,11 @@ class SeafDirResource(DAVCollection):
             raise DAVError(HTTP_NOT_FOUND)
 
         if isinstance(member, SeafFile):
-            return SeafileResource(member_path, self.repo, member_rel_path, member, self.environ)
+            return SeafileResource(member_path, self.repo, member_rel_path,
+                                   member, self.environ)
         else:
-            return SeafDirResource(member_path, self.repo, member_rel_path, member, self.environ)
+            return SeafDirResource(member_path, self.repo, member_rel_path,
+                                   member, self.environ)
 
     def get_member_list(self):
         member_list = []
@@ -431,7 +453,7 @@ class SeafDirResource(DAVCollection):
 
         See DAVResource.createEmptyResource()
         """
-        assert not "/" in name
+        assert "/" not in name
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
 
@@ -475,7 +497,7 @@ class SeafDirResource(DAVCollection):
 
         See DAVResource.createCollection()
         """
-        assert not "/" in name
+        assert "/" not in name
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
 
@@ -504,7 +526,7 @@ class SeafDirResource(DAVCollection):
             if not filename:
                 raise DAVError(HTTP_BAD_REQUEST)
 
-            seafile_api.del_file(self.repo.id, parent, '[\"'+filename+'\"]', self.username)
+            seafile_api.del_file(self.repo.id, parent, '[\"' + filename + '\"]', self.username)
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
@@ -537,8 +559,9 @@ class SeafDirResource(DAVCollection):
             if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
                 raise DAVError(HTTP_BAD_REQUEST)
 
-            seafile_api.move_file(self.repo.id, src_dir, '[\"'+src_file+'\"]',
-                                dest_repo.id, dest_dir, '[\"'+dest_file+'\"]', 0, self.username, NEED_PROGRESS, SYNCHRONOUS)
+            seafile_api.move_file(self.repo.id, src_dir, '[\"' + src_file + '\"]',
+                                  dest_repo.id, dest_dir, '[\"' + dest_file + '\"]',
+                                  0, self.username, NEED_PROGRESS, SYNCHRONOUS)
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
@@ -571,14 +594,17 @@ class SeafDirResource(DAVCollection):
             if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
                 raise DAVError(HTTP_BAD_REQUEST)
 
-            seafile_api.copy_file(self.repo.id, src_dir, '[\"'+src_file+'\"]',
-                                dest_repo.id, dest_dir, '[\"'+dest_file+'\"]', self.username, NEED_PROGRESS, SYNCHRONOUS)
+            seafile_api.copy_file(self.repo.id, src_dir, '[\"' + src_file + '\"]',
+                                  dest_repo.id, dest_dir, '[\"' + dest_file + '\"]',
+                                  self.username, NEED_PROGRESS, SYNCHRONOUS)
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
         return True
 
+
 class RootResource(DAVCollection):
+
     def __init__(self, username, environ, show_repo_id):
         super(RootResource, self).__init__("/", environ)
         self.username = username
@@ -588,16 +614,20 @@ class RootResource(DAVCollection):
 
     # Getter methods for standard live properties
     def get_creation_date(self):
-#        return int(time.time())
+        # return int(time.time())
         return None
+
     def get_display_name(self):
         return ""
+
     def get_directory_info(self):
         return None
+
     def get_etag(self):
         return None
+
     def getLastModified(self):
-#        return int(time.time())
+        # return int(time.time())
         return None
 
     def get_member_names(self):
@@ -662,7 +692,7 @@ class RootResource(DAVCollection):
 
     def _createRootRes(self, repo, name):
         obj = get_repo_root_seafdir(repo)
-        return SeafDirResource("/"+name, repo, "", obj, self.environ)
+        return SeafDirResource("/" + name, repo, "", obj, self.environ)
 
     # --- Read / write ---------------------------------------------------------
 
@@ -682,9 +712,6 @@ class RootResource(DAVCollection):
         raise DAVError(HTTP_FORBIDDEN)
 
 
-#===============================================================================
-# SeafileProvider
-#===============================================================================
 class SeafileProvider(DAVProvider):
 
     def __init__(self, show_repo_id, readonly=False):
@@ -702,7 +729,7 @@ class SeafileProvider(DAVProvider):
         delete_items = []
         with self.block_map_lock:
             for obj_id, block in self.block_map.items():
-                if time.time() - block.timestamp >= 3600*24:
+                if time.time() - block.timestamp >= 3600 * 24:
                     delete_items.append(obj_id)
             for i in range(len(delete_items)):
                 self.block_map.pop(delete_items[i])
@@ -714,7 +741,6 @@ class SeafileProvider(DAVProvider):
         if self.readonly:
             rw = "Read-Only"
         return "%s for Seafile (%s)" % (self.__class__.__name__, rw)
-
 
     def get_resource_inst(self, path, environ):
         """Return info dictionary for path.
@@ -749,6 +775,7 @@ class SeafileProvider(DAVProvider):
             return SeafDirResource(path, repo, rel_path, obj, environ)
         return SeafileResource(path, repo, rel_path, obj, environ, self.block_map, self.block_map_lock)
 
+
 def resolvePath(path, username, org_id, is_guest):
     path = unicodedata.normalize('NFC', path)
     segments = path.strip("/").split("/")
@@ -768,7 +795,7 @@ def resolvePath(path, username, org_id, is_guest):
         parent = obj
         obj = parent.lookup(segment)
 
-        if not obj or (isinstance(obj, SeafFile) and i != n_segs-1):
+        if not obj or (isinstance(obj, SeafFile) and i != n_segs - 1):
             raise DAVError(HTTP_NOT_FOUND)
 
         rel_path += "/" + segment
@@ -778,6 +805,7 @@ def resolvePath(path, username, org_id, is_guest):
         obj.mtime = parent.lookup_dent(segment).mtime
 
     return (repo, rel_path, obj)
+
 
 def resolveRepoPath(repo, path):
     path = unicodedata.normalize('NFC', path)
@@ -790,16 +818,18 @@ def resolveRepoPath(repo, path):
     for segment in segments:
         obj = obj.lookup(segment)
 
-        if not obj or (isinstance(obj, SeafFile) and i != n_segs-1):
+        if not obj or (isinstance(obj, SeafFile) and i != n_segs - 1):
             return None
 
         i += 1
 
     return obj
 
+
 def get_repo_root_seafdir(repo):
     root_id = commit_mgr.get_commit_root_id(repo.id, repo.version, repo.head_cmmt_id)
     return fs_mgr.load_seafdir(repo.store_id, repo.version, root_id)
+
 
 def getRepoByName(repo_name, username, org_id, is_guest):
     repos = getAccessibleRepos(username, org_id, is_guest)
@@ -819,6 +849,7 @@ def getRepoByName(repo_name, username, org_id, is_guest):
             raise DAVError(HTTP_NOT_FOUND)
 
     return ret_repo
+
 
 def getAccessibleRepos(username, org_id, is_guest):
     all_repos = {}
@@ -853,10 +884,10 @@ def getAccessibleRepos(username, org_id, is_guest):
 
     try:
         repos = get_group_repos(username, org_id)
-    except SearpcError as e:
+    except SearpcError:
         util.warn("Failed to get groups for %s" % username)
     for grepo in repos:
-        if grepo: 
+        if grepo:
             addRepo(grepo)
 
     for prepo in list_inner_pub_repos(username, org_id, is_guest):
@@ -865,17 +896,20 @@ def getAccessibleRepos(username, org_id, is_guest):
 
     return all_repos.values()
 
+
 def get_group_repos(username, org_id):
     if org_id:
         return seafile_api.get_org_group_repos_by_user(username, org_id)
     else:
         return seafile_api.get_group_repos_by_user(username)
 
+
 def get_owned_repos(username, org_id):
     if org_id:
         return seafile_api.get_org_owned_repo_list(org_id, username)
     else:
         return seafile_api.get_owned_repo_list(username)
+
 
 def get_share_in_repo_list(username, org_id):
     """List share in repos.
@@ -887,6 +921,7 @@ def get_share_in_repo_list(username, org_id):
         repo_list = seafile_api.get_share_in_repo_list(username, -1, -1)
 
     return repo_list
+
 
 def list_inner_pub_repos(username, org_id, is_guest):
     if is_guest:
