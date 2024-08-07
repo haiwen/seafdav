@@ -142,6 +142,9 @@ class SeafileDomainController(BaseDomainController):
 
 def validate_ldap_password(username, password):
 
+    if not username or not password:
+        return False
+
     ldap_auth_backend = CustomLDAPBackend()
     return ldap_auth_backend.authenticate(username, password)
 
