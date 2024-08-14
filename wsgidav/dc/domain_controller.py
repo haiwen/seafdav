@@ -3,7 +3,6 @@ import base64
 import seahub_settings
 from seaserv import ccnet_api as api
 from wsgidav.dc.seaf_utils import multi_tenancy_enabled
-from wsgidav.dc.seaf_utils import CustomLDAPBackend
 from wsgidav.dc import seahub_db
 import wsgidav.util as util
 from wsgidav.dc.base_dc import BaseDomainController
@@ -71,13 +70,6 @@ class SeafileDomainController(BaseDomainController):
                     res = q.first()
                     if res:
                         ccnet_email = res[0]
-                    else:
-                        social_auth = seahub_db.Base.classes.social_auth_usersocialauth
-                        q = session.query(social_auth.username) \
-                                   .filter(social_auth.uid == username) \
-                                   .filter(social_auth.provider == getattr(seahub_settings, 'LDAP_PROVIDER', 'ldap'))
-                        res = q.first()
-                        ccnet_email = res[0] if res else username
 
             if not ccnet_email:
                 _logger.warning('User %s doesn\'t exist', username)
@@ -100,13 +92,11 @@ class SeafileDomainController(BaseDomainController):
                         return False
             else:
                 if not enable_webdav_secret:
-                    if api.validate_emailuser(ccnet_email, password) != 0 and \
-                            not validate_ldap_password(username, password):
+                    if api.validate_emailuser(ccnet_email, password) != 0:
                         return False
                 else:
                     if api.validate_emailuser(ccnet_email, password) != 0 and \
-                            not validate_secret(session, ccnet_email, password) and \
-                            not validate_ldap_password(username, password):
+                            not validate_secret(session, ccnet_email, password):
                         return False
 
             username = ccnet_email
@@ -138,15 +128,6 @@ class SeafileDomainController(BaseDomainController):
         environ["http_authenticator.username"] = username
 
         return True
-
-
-def validate_ldap_password(username, password):
-
-    if not username or not password:
-        return False
-
-    ldap_auth_backend = CustomLDAPBackend()
-    return ldap_auth_backend.authenticate(username, password)
 
 
 def validate_secret(session, ccnet_email, password):
