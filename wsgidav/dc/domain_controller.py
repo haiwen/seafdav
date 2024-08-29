@@ -1,6 +1,6 @@
 import hashlib
 import base64
-import seahub_settings
+import seahub.settings as seahub_settings
 from seaserv import ccnet_api as api
 from wsgidav.dc.seaf_utils import multi_tenancy_enabled
 from wsgidav.dc import seahub_db
