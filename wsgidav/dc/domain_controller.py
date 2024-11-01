@@ -66,7 +66,7 @@ class SeafileDomainController(BaseDomainController):
                 if session:
                     profile_profile = seahub_db.Base.classes.profile_profile
                     q = session.query(profile_profile.user) \
-                               .filter(profile_profile.contact_email == username)
+                               .filter((profile_profile.contact_email == username) | (profile_profile.login_id == username))
                     res = q.first()
                     if res:
                         ccnet_email = res[0]
