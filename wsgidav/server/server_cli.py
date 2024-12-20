@@ -696,7 +696,7 @@ def _run_gunicorn(app, config, server):
     # See https://docs.gunicorn.org/en/latest/settings.html
     server_args = {
         "bind": "{}:{}".format(config["host"], config["port"]),
-        'workers': config.get('workers'),
+        'threads': config.get('workers'),
         "timeout": config.get('timeout'),
         "pidfile": config.get('pidfile'),
     }
