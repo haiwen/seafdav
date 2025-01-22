@@ -446,17 +446,18 @@ def init_logging(config):
     logger_date_format = log_opts.get("logger_date_format", DEFAULT_LOGGER_DATE_FORMAT)
     logger_format = log_opts.get("logger_format", DEFAULT_LOGGER_FORMAT)
     # Verbose format by default (but wsgidav.util.DEFAULT_CONFIG defines a short format)
-    # logger_date_format = log_opts.get("logger_date_format", "%Y-%m-%d %H:%M:%S")
-    # logger_format = log_opts.get(
-    #     "logger_format",
-    #     "%(asctime)s.%(msecs)03d - <%(thread)d> %(name)-27s %(levelname)-8s:  %(message)s",
-    # )
+    logger_date_format = "%Y-%m-%d %H:%M:%S"
 
     log_file = config.get('log_file', None)
-    if not log_file:
+    seafile_log_to_stdout = os.getenv('SEAFILE_LOG_TO_STDOUT', 'false') == 'true'
+    logger_format = "[seafdav] [%(asctime)s] [%(levelname)s] %(message)s"
+    if seafile_log_to_stdout:
+        myHandler = logging.StreamHandler(sys.stdout)
+    elif not log_file:
         myHandler = logging.StreamHandler(sys.stdout)
     else:
         myHandler = logging.FileHandler(log_file)
+        logger_format = "[%(asctime)s] [%(levelname)s] %(message)s"
 
     formatter = logging.Formatter(logger_format, logger_date_format)
 
