@@ -450,14 +450,14 @@ def init_logging(config):
 
     log_file = config.get('log_file', None)
     seafile_log_to_stdout = os.getenv('SEAFILE_LOG_TO_STDOUT', 'false') == 'true'
-    logger_format = "[seafdav] [%(asctime)s] [%(levelname)s] %(message)s"
+    logger_format = "[seafdav] [%(asctime)s] [%(levelname)s] %(name)s:%(lineno)s %(message)s"
     if seafile_log_to_stdout:
         myHandler = logging.StreamHandler(sys.stdout)
     elif not log_file:
         myHandler = logging.StreamHandler(sys.stdout)
     else:
         myHandler = logging.FileHandler(log_file)
-        logger_format = "[%(asctime)s] [%(levelname)s] %(message)s"
+        logger_format = "[%(asctime)s] [%(levelname)s] %(name)s:%(lineno)s %(message)s"
 
     formatter = logging.Formatter(logger_format, logger_date_format)
 
