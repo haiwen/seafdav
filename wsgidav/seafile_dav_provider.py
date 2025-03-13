@@ -906,9 +906,11 @@ def get_group_repos(username, org_id):
 
 def get_owned_repos(username, org_id):
     if org_id:
-        return seafile_api.get_org_owned_repo_list(org_id, username)
+        owned_repos = seafile_api.get_org_owned_repo_list(org_id, username)
     else:
-        return seafile_api.get_owned_repo_list(username)
+        owned_repos = seafile_api.get_owned_repo_list(username)
+
+    return [repo for repo in owned_repos if repo.repo_type != 'wiki']
 
 
 def get_share_in_repo_list(username, org_id):
