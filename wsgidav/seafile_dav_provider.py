@@ -161,8 +161,9 @@ class SeafileResource(DAVNonCollection):
         if cached_mtime:
             return cached_mtime
 
-        if self.obj.mtime > 0:
-            return self.obj.mtime
+        obj_mtime = getattr(self.obj, 'mtime', None)
+        if obj_mtime is not None and obj_mtime > 0:
+            return obj_mtime
 
         # XXX: What about not return last modified for files in v0 repos,
         # since they can be too expensive sometimes?
