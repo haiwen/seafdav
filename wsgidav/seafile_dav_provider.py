@@ -899,10 +899,11 @@ def getAccessibleRepos(username, org_id, is_guest):
 
 def get_group_repos(username, org_id):
     if org_id:
-        return seafile_api.get_org_group_repos_by_user(username, org_id)
+        group_repos = seafile_api.get_org_group_repos_by_user(username, org_id)
     else:
-        return seafile_api.get_group_repos_by_user(username)
+        group_repos = seafile_api.get_group_repos_by_user(username)
 
+    return [repo for repo in group_repos if repo.repo_type != 'wiki']
 
 def get_owned_repos(username, org_id):
     if org_id:
@@ -922,7 +923,7 @@ def get_share_in_repo_list(username, org_id):
     else:
         repo_list = seafile_api.get_share_in_repo_list(username, -1, -1)
 
-    return repo_list
+    return [repo for repo in repo_list if repo.repo_type != 'wiki']
 
 
 def list_inner_pub_repos(username, org_id, is_guest):
