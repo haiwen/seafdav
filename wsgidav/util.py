@@ -23,6 +23,7 @@ from hashlib import md5
 from pprint import pformat
 from typing import Iterable, Optional
 from urllib.parse import quote
+from xml.sax.saxutils import escape
 
 from wsgidav.dav_error import (
     HTTP_BAD_REQUEST,
@@ -87,6 +88,7 @@ def to_str(s, encoding="utf8"):
         s = str(s, encoding)
     elif type(s) is not str:
         s = str(s)
+    s = escape(s)
     return s
 
 

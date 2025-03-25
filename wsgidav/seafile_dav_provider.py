@@ -790,8 +790,12 @@ def resolveRepoPath(repo, path):
     return obj
 
 def get_repo_root_seafdir(repo):
-    root_id = commit_mgr.get_commit_root_id(repo.id, repo.version, repo.head_cmmt_id)
-    return fs_mgr.load_seafdir(repo.store_id, repo.version, root_id)
+    try:
+        root_id = commit_mgr.get_commit_root_id(repo.id, repo.version, repo.head_cmmt_id)
+        return fs_mgr.load_seafdir(repo.store_id, repo.version, root_id)
+    except Exception as e:
+        _logger.error("Failed to get repo root: {}/{}".format(repo.id, repo.head_cmmt_id))
+        raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
 def getRepoByName(repo_name, username, org_id, is_guest):
     repos = getAccessibleRepos(username, org_id, is_guest)
