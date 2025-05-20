@@ -18,7 +18,7 @@ pytest = "*"  # "~=7.3"
 pytest-cov = "*"  # "~=4.0"
 pytest-html = "*"
 python-pam = "*"  # "~=1.8"
-pywin32 = {version = "*", os_name = "== 'nt'"}
+pywin32 = { version = "*", sys_platform = "== 'win32'" }
 recommonmark = "*"
 requests = "*"
 rope = "*"
