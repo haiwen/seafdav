@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import gunicorn.app.base
 """
 server_cli
 ==========
@@ -296,49 +297,17 @@ def _loadSeafileSettings(config):
         'default_to_digest': False,
         'domain_controller': SeafileDomainController
     }
-    # Load share_name from seafdav config file
-
-    # haiwen
-    #   - conf
-    #     - seafdav.conf
-
-    ##### a sample seafdav.conf, we only care: "share_name", "workers", "timeout"
-    # [WEBDAV]
-    # enabled = true
-    # port = 8080
-    # share_name = /seafdav
-    # workers = 5
-    # timeout = 1200
-    ##### a sample seafdav.conf
-
-    share_name = '/'
-    workers = 5
-    timeout = 1200
-    show_repo_id = False
-
-    seafdav_conf = os.environ.get('SEAFDAV_CONF')
-    if seafdav_conf and os.path.exists(seafdav_conf):
-        import configparser
-        cp = configparser.ConfigParser()
-        cp.read(seafdav_conf)
-        section_name = 'WEBDAV'
-
-        if cp.has_option(section_name, 'share_name'):
-            share_name = cp.get(section_name, 'share_name')
-        if cp.has_option(section_name, 'workers'):
-            workers = cp.get(section_name, 'workers')
-        if cp.has_option(section_name, 'timeout'):
-            timeout = cp.get(section_name, 'timeout')
-        if cp.has_option(section_name, 'show_repo_id'):
-            if cp.get(section_name, 'show_repo_id').lower() == 'true':
-                show_repo_id = True
 
     # Setup provider mapping for Seafile. E.g. /seafdav -> seafile provider.
     provider_mapping = {}
-    provider_mapping[share_name] = SeafileProvider(show_repo_id=show_repo_id)
+
+    provider_mapping['/seafdav'] = SeafileProvider(show_repo_id=True)
     config['provider_mapping'] = provider_mapping
+
+    workers = os.environ.get('SEAFDAV_WORKERS', 5)
     config['workers'] = workers
-    config['timeout'] = timeout
+    config['timeout'] = 1200
+
 
 def _read_config_file(config_file, _verbose):
     """Read configuration file options into a dictionary."""
@@ -499,7 +468,6 @@ def _init_config():
 
     return cli_opts, config
 
-import gunicorn.app.base
 
 class GunicornApplication(gunicorn.app.base.BaseApplication):
 
