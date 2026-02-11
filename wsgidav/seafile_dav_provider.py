@@ -276,6 +276,9 @@ class SeafileResource(DAVNonCollection):
 
             parent, filename = os.path.split(self.rel_path)
             seafile_api.del_file(self.repo.id, parent, '[\"' + filename + '\"]', self.username)
+
+            self.remove_all_properties(recursive=True)
+            self.remove_all_locks(recursive=True)
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
@@ -532,6 +535,9 @@ class SeafDirResource(DAVCollection):
                 raise DAVError(HTTP_BAD_REQUEST)
 
             seafile_api.del_file(self.repo.id, parent, '[\"' + filename + '\"]', self.username)
+
+            self.remove_all_properties(recursive=True)
+            self.remove_all_locks(recursive=True)
         except SearpcError as e:
             raise DAVError(HTTP_INTERNAL_ERROR, e.msg)
 
