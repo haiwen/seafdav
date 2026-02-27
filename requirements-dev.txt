@@ -19,3 +19,6 @@ twine~=5.0
 WebTest~=3.0
 wheel
 yabs>=0.6
+flake8~=6.0
+flake8-bugbear~=23.1
+flake8-quotes~=3.3.2
