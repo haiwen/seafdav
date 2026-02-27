@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import gunicorn.app.base
 """
 server_cli
 ==========
@@ -49,6 +50,8 @@ from wsgidav.default_conf import DEFAULT_CONFIG, DEFAULT_VERBOSE
 from wsgidav.fs_dav_provider import FilesystemProvider
 from wsgidav.wsgidav_app import WsgiDAVApp
 from wsgidav.xml_tools import use_lxml
+from wsgidav.dc.domain_controller import SeafileDomainController
+from wsgidav.seafile_dav_provider import SeafileProvider
 
 try:
     # Try pyjson5 first because it's faster than json5
@@ -179,6 +182,16 @@ See https://github.com/mar10/wsgidav for additional information.
         help="used by 'cheroot' server if SSL certificates are configured "
         "(default: builtin).",
     )
+    parser.add_argument(
+        "--pid",
+        dest="pidfile",
+        help="PID file path",
+    )
+    parser.add_argument(
+        "--log-file",
+        dest="log_file",
+        help="log file path",
+    )
 
     qv_group = parser.add_mutually_exclusive_group()
     qv_group.add_argument(
@@ -276,6 +289,26 @@ See https://github.com/mar10/wsgidav for additional information.
     return cmdLineOpts, parser
 
 
+def _loadSeafileSettings(config):
+    # Seafile cannot support digest auth, since plain text password is needed.
+    config['http_authenticator'] = {
+        'accept_basic': True,
+        'accept_digest': False,
+        'default_to_digest': False,
+        'domain_controller': SeafileDomainController
+    }
+
+    # Setup provider mapping for Seafile. E.g. /seafdav -> seafile provider.
+    provider_mapping = {}
+
+    provider_mapping['/seafdav'] = SeafileProvider(show_repo_id=True)
+    config['provider_mapping'] = provider_mapping
+
+    workers = os.environ.get('SEAFDAV_WORKERS', 5)
+    config['workers'] = workers
+    config['timeout'] = 1200
+
+
 def _read_config_file(config_file, _verbose):
     """Read configuration file options into a dictionary."""
 
@@ -330,6 +363,9 @@ def _init_config():
             print("Running without configuration file.")
 
     # Command line overrides file
+    if cli_opts.get("log_file"):
+        log_file = cli_opts.get("log_file")
+        config['log_file'] = log_file
     if cli_opts.get("port"):
         config["port"] = cli_opts.get("port")
     if cli_opts.get("host"):
@@ -361,6 +397,12 @@ def _init_config():
     if not config["provider_mapping"]:
         parser.error("No DAV provider defined.")
 
+    _loadSeafileSettings(config)
+
+    pid_file = cli_opts.get("pidfile")
+    if pid_file:
+        pid_file = os.path.abspath(pid_file)
+        config["pidfile"] = pid_file
     # Quick-configuration of DomainController
     auth = cli_opts.get("auth")
     auth_conf = util.get_dict_value(config, "http_authenticator", as_dict=True)
@@ -425,6 +467,23 @@ def _init_config():
     #     # pydevd.settrace()
 
     return cli_opts, config
+
+
+class GunicornApplication(gunicorn.app.base.BaseApplication):
+
+    def __init__(self, app, options=None):
+        self.options = options or {}
+        self.application = app
+        super().__init__()
+
+    def load_config(self):
+        config = {key: value for key, value in self.options.items()
+                  if key in self.cfg.settings and value is not None}
+        for key, value in config.items():
+            self.cfg.set(key.lower(), value)
+
+    def load(self):
+        return self.application
 
 
 def _run_cheroot(app, config, _server):
@@ -605,8 +664,9 @@ def _run_gunicorn(app, config, server):
     # See https://docs.gunicorn.org/en/latest/settings.html
     server_args = {
         "bind": "{}:{}".format(config["host"], config["port"]),
-        "threads": 50,
-        "timeout": 1200,
+        'threads': config.get('workers'),
+        "timeout": config.get('timeout'),
+        "pidfile": config.get('pidfile'),
     }
     if info["use_ssl"]:
         server_args.update(
