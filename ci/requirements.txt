@@ -1,0 +1,16 @@
+termcolor>=1.1.0
+requests>=2.8.0
+pytest>=3.3.2
+backports.functools_lru_cache>=1.4
+tenacity>=4.8.0
+defusedxml~=0.5
+Jinja2~=3.1.3
+jsmin~=2.2
+python-pam~=1.8
+PyYAML~=5.1
+six~=1.12
+gunicorn
+future
+lxml
+sqlalchemy
+pyjson5

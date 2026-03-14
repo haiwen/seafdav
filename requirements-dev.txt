@@ -11,6 +11,9 @@ recommonmark
 requests
 ruff
 setuptools~=69.5
+flake8~=6.0
+flake8-bugbear~=23.1
+flake8-quotes~=3.3.2
 #Sphinx
 #sphinx_rtd_theme
 stressor

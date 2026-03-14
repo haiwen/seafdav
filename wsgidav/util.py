@@ -452,18 +452,25 @@ def init_logging(config):
     logger_date_format = log_opts.get("logger_date_format", DEFAULT_LOGGER_DATE_FORMAT)
     logger_format = log_opts.get("logger_format", DEFAULT_LOGGER_FORMAT)
     # Verbose format by default (but wsgidav.util.DEFAULT_CONFIG defines a short format)
-    # logger_date_format = log_opts.get("logger_date_format", "%Y-%m-%d %H:%M:%S")
-    # logger_format = log_opts.get(
-    #     "logger_format",
-    #     "%(asctime)s.%(msecs)03d - <%(thread)d> %(name)-27s %(levelname)-8s:  %(message)s",
-    # )
+    logger_date_format = "%Y-%m-%d %H:%M:%S"
+
+    log_file = config.get('log_file', None)
+    seafile_log_to_stdout = os.getenv('SEAFILE_LOG_TO_STDOUT', 'false') == 'true'
+    logger_format = "[seafdav] [%(asctime)s] [%(levelname)s] %(name)s:%(lineno)s %(message)s"
+    if seafile_log_to_stdout:
+        myHandler = logging.StreamHandler(sys.stdout)
+    elif not log_file:
+        myHandler = logging.StreamHandler(sys.stdout)
+    else:
+        myHandler = logging.FileHandler(log_file)
+        logger_format = "[%(asctime)s] [%(levelname)s] %(name)s:%(lineno)s %(message)s"
 
     formatter = logging.Formatter(logger_format, logger_date_format)
 
     # Define handlers
-    consoleHandler = logging.StreamHandler(sys.stdout)
+    #consoleHandler = logging.StreamHandler(sys.stdout)
     #    consoleHandler = logging.StreamHandler(sys.stderr)
-    consoleHandler.setFormatter(formatter)
+    myHandler.setFormatter(formatter)
     # consoleHandler.setLevel(logging.DEBUG)
 
     # Add the handlers to the base logger
@@ -495,7 +502,7 @@ def init_logging(config):
             pass
         logger.removeHandler(hdlr)
 
-    logger.addHandler(consoleHandler)
+    logger.addHandler(myHandler)
 
     if verbose >= 3:
         for e in enable_loggers:
