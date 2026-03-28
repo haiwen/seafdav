@@ -17,7 +17,7 @@ from pysearpc import SearpcError
 from seafobj import commit_mgr, fs_mgr
 from seafobj.fs import SeafFile, SeafDir
 from seafobj.blocks import block_mgr
-from wsgidav.dc.seaf_utils import SEAFILE_CONF_DIR
+from wsgidav.dc.seaf_utils import SEAFILE_DATA_DIR
 
 __docformat__ = "reStructuredText"
 
@@ -729,7 +729,7 @@ class SeafileProvider(DAVProvider):
         super(SeafileProvider, self).__init__()
         self.readonly = readonly
         self.show_repo_id = show_repo_id
-        self.tmpdir = os.path.join(SEAFILE_CONF_DIR, "webdavtmp")
+        self.tmpdir = os.path.join(SEAFILE_DATA_DIR, "webdavtmp")
         self.block_map = {}
         self.block_map_lock = Lock()
         self.clean_block_map_task_started = False
