@@ -115,6 +115,11 @@ class SeafileDomainController(BaseDomainController):
                 environ['seafile.is_guest'] = False
         except Exception:
             _logger.exception('get_emailuser')
+            return False
+
+        if not user.is_active:
+            _logger.warning('User %s is deactivated', username)
+            return False
 
         if multi_tenancy_enabled():
             try:
