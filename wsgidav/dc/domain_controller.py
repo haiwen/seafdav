@@ -50,6 +50,7 @@ class SeafileDomainController(BaseDomainController):
         return ""
 
     def basic_auth_user(self, realmname, username, password, environ):
+
         if "'" in username:
             return False
 
@@ -59,22 +60,34 @@ class SeafileDomainController(BaseDomainController):
             if self.session_cls:
                 session = self.session_cls()
 
+            # check if user exists
+            # get user from ccnet db
             user = api.get_emailuser(username)
-            if user:
-                ccnet_email = user.email
-            else:
-                if session:
-                    profile_profile = seahub_db.Base.classes.profile_profile
-                    q = session.query(profile_profile.user) \
-                               .filter((profile_profile.contact_email == username) | (profile_profile.login_id == username))
-                    res = q.first()
-                    if res:
-                        ccnet_email = res[0]
+            if not user:
+                # get user via contact_email or login_id
+                if not session:
+                    _logger.exception('Session is None')
+                    return False
 
-            if not ccnet_email:
-                _logger.warning('User %s doesn\'t exist', username)
-                return False
+                profile_profile = seahub_db.Base.classes.profile_profile
+                q = session.query(profile_profile.user).filter(
+                    (profile_profile.contact_email == username) |
+                    (profile_profile.login_id == username)
+                )
+                res = q.first()
+                if not res:
+                    _logger.warning('User %s doesn\'t exist', username)
+                    return False
 
+                ccnet_email = res[0]
+                user = api.get_emailuser(ccnet_email)
+                if not user:
+                    _logger.warning('User %s doesn\'t exist', username)
+                    return False
+
+            ccnet_email = user.email
+
+            # validate user
             enable_webdav_secret = False
             if hasattr(seahub_settings, 'ENABLE_WEBDAV_SECRET'):
                 enable_webdav_secret = seahub_settings.ENABLE_WEBDAV_SECRET
@@ -98,34 +111,28 @@ class SeafileDomainController(BaseDomainController):
                     if api.validate_emailuser(ccnet_email, password) != 0 and \
                             not validate_secret(session, ccnet_email, password):
                         return False
-
-            username = ccnet_email
         except Exception as e:
-            _logger.warning('Failed to login: %s', e)
+            _logger.exception('Failed to login: %s', e)
             return False
         finally:
             if session:
                 session.close()
 
-        try:
-            user = api.get_emailuser_with_import(username)
-            if user.role == 'guest':
-                environ['seafile.is_guest'] = True
-            else:
-                environ['seafile.is_guest'] = False
-        except Exception:
-            _logger.exception('get_emailuser')
+        if user.role == 'guest':
+            environ['seafile.is_guest'] = True
+        else:
+            environ['seafile.is_guest'] = False
 
         if multi_tenancy_enabled():
             try:
-                orgs = api.get_orgs_by_user(username)
+                orgs = api.get_orgs_by_user(ccnet_email)
                 if orgs:
                     environ['seafile.org_id'] = orgs[0].org_id
             except Exception:
                 _logger.exception('get_orgs_by_user')
                 pass
 
-        environ["http_authenticator.username"] = username
+        environ["http_authenticator.username"] = ccnet_email
 
         return True
 
