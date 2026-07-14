@@ -76,13 +76,11 @@ class SeafileDomainController(BaseDomainController):
                 )
                 res = q.first()
                 if not res:
-                    _logger.warning('User %s doesn\'t exist', username)
                     return False
 
                 ccnet_email = res[0]
                 user = api.get_emailuser(ccnet_email)
                 if not user:
-                    _logger.warning('User %s doesn\'t exist', username)
                     return False
 
             ccnet_email = user.email
