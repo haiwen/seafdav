@@ -116,6 +116,10 @@ class SeafileDomainController(BaseDomainController):
             if session:
                 session.close()
 
+        if not user.is_active:
+            _logger.warning('User %s is deactivated', ccnet_email)
+            return False
+
         if user.role == 'guest':
             environ['seafile.is_guest'] = True
         else:
