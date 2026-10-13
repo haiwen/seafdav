@@ -297,9 +297,8 @@ def _loadSeafileSettings(config):
         'domain_controller': SeafileDomainController
     }
     share_name = '/seafdav'
-    workers = os.environ.get('SEAFDAV_WORKERS', 5)
     timeout = 1200
-    show_repo_id = False
+    show_repo_id = True
 
     seafdav_conf = os.environ.get('SEAFDAV_CONF')
     if seafdav_conf and os.path.exists(seafdav_conf):
@@ -320,8 +319,9 @@ def _loadSeafileSettings(config):
     provider_mapping = {}
     provider_mapping[share_name] = SeafileProvider(show_repo_id=show_repo_id)
     config['provider_mapping'] = provider_mapping
-    config['workers'] = workers
+    config['workers'] = os.environ.get('SEAFDAV_WORKERS', 5)
     config['timeout'] = timeout
+
 
 def _read_config_file(config_file, _verbose):
     """Read configuration file options into a dictionary."""
