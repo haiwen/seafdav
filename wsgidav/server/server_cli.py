@@ -296,17 +296,32 @@ def _loadSeafileSettings(config):
         'default_to_digest': False,
         'domain_controller': SeafileDomainController
     }
+    share_name = '/seafdav'
+    workers = os.environ.get('SEAFDAV_WORKERS', 5)
+    timeout = 1200
+    show_repo_id = False
+
+    seafdav_conf = os.environ.get('SEAFDAV_CONF')
+    if seafdav_conf and os.path.exists(seafdav_conf):
+        import configparser
+        cp = configparser.ConfigParser()
+        cp.read(seafdav_conf)
+        section_name = 'WEBDAV'
+
+        if cp.has_option(section_name, 'share_name'):
+            share_name = cp.get(section_name, 'share_name')
+        if cp.has_option(section_name, 'timeout'):
+            timeout = cp.get(section_name, 'timeout')
+        if cp.has_option(section_name, 'show_repo_id'):
+            if cp.get(section_name, 'show_repo_id').lower() == 'true':
+                show_repo_id = True
 
     # Setup provider mapping for Seafile. E.g. /seafdav -> seafile provider.
     provider_mapping = {}
-
-    provider_mapping['/seafdav'] = SeafileProvider(show_repo_id=True)
+    provider_mapping[share_name] = SeafileProvider(show_repo_id=show_repo_id)
     config['provider_mapping'] = provider_mapping
-
-    workers = os.environ.get('SEAFDAV_WORKERS', 5)
     config['workers'] = workers
-    config['timeout'] = 1200
-
+    config['timeout'] = timeout
 
 def _read_config_file(config_file, _verbose):
     """Read configuration file options into a dictionary."""

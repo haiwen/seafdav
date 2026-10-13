@@ -121,6 +121,10 @@ class SeafileDomainController(BaseDomainController):
         else:
             environ['seafile.is_guest'] = False
 
+        if not user.is_active:
+            _logger.warning('User %s is deactivated', username)
+            return False
+
         if multi_tenancy_enabled():
             try:
                 orgs = api.get_orgs_by_user(ccnet_email)
