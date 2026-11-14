@@ -308,12 +308,6 @@ class SeafileResource(DAVNonCollection):
             if not seafile_api.is_valid_filename(dest_repo.id, dest_file):
                 raise DAVError(HTTP_BAD_REQUEST)
 
-            # some clients such as GoodReader requires "overwrite" semantics
-            file_id_dest = seafile_api.get_file_id_by_path(dest_repo.id, rel_path)
-            if file_id_dest is not None:
-                seafile_api.del_file(dest_repo.id, dest_dir, '[\"' + dest_file + '\"]',
-                                     self.username)
-
             seafile_api.move_file(self.repo.id, src_dir, '[\"' + src_file + '\"]',
                                   dest_repo.id, dest_dir, '[\"' + dest_file + '\"]',
                                   1, self.username, NEED_PROGRESS, SYNCHRONOUS)
