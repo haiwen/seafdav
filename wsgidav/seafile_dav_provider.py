@@ -456,6 +456,9 @@ class SeafDirResource(DAVCollection):
         See DAVResource.createEmptyResource()
         """
         assert "/" not in name
+        # Seafile stores names in NFC; keep the returned resource path in sync
+        # with the stored name for the following begin_write() permission check.
+        name = unicodedata.normalize('NFC', name)
         if self.provider.readonly:
             raise DAVError(HTTP_FORBIDDEN)
 
